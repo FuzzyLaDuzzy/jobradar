@@ -9,8 +9,8 @@ A local app that finds jobs in your area of Portugal across job boards and compa
 - **Reads many sources** through the public APIs and feeds that the sites themselves publish:
   - **ITJobs.pt**, the main Portuguese IT job board (free read-only key)
   - **Landing.jobs**, **Net-Empregos** and **Randstad**, through their official feeds
-  - **Sysmatch**, from its jobs page
-  - **Company careers sites** on SmartRecruiters, Lever, Workday, SAP SuccessFactors and BambooHR (Bosch, Farfetch, Accenture, Deloitte, EY, Fujitsu… or any company you add)
+  - **Sysmatch** and **Eurotux**, from their jobs pages
+  - **Company careers sites** on SmartRecruiters, Lever, Workday, SAP SuccessFactors, BambooHR, Recruitee and Zoho Recruit (Bosch, Farfetch, Accenture, Deloitte, EY, Fujitsu, Mercedes-Benz.io, Edigma… or any company you add)
 - **Filters** by your area, the kind of job (words the title must have), your level (junior words, senior words to skip), excluded words and companies, job age and typical scam signs. When a source doesn't say where the job is, it looks for the city in the description.
 - **Scores each job from 0 to 100** from keywords (level, area, your skills and interests), with a penalty for jobs that ask for 3+ years. With an AI key, an LLM also scores each new job against your profile and writes one sentence on why.
 - **Your profile from your CV** (👤): drop your CV (PDF) and the AI fills in your name, contacts, skills, education, projects, experience and the jobs you're after; check and fix anything before saving, or fill it in by hand. Everything lands in `config.yaml`, which the score, the messages and the interview prep use.
@@ -102,6 +102,8 @@ To add a company by hand, open one of its job pages and look at the domain of th
 | Workday | the careers page, `*.myworkdayjobs.com/<Site>` | `- name: Accenture`<br>`  url: https://accenture.wd103.myworkdayjobs.com/AccentureCareers` |
 | SAP SuccessFactors | sites like `jobs.<company>...` with a `/search/` page; if the search only works in a browser, `sitemap: true` reads the jobs from `sitemap.xml` | `- name: Deloitte`<br>`  url: https://jobs.deloitte.pt` |
 | BambooHR | `<site>.bamboohr.com/careers` | `- name: Uphold`<br>`  site: uphold` |
+| Recruitee | `<company>.recruitee.com` (the apply links say which) | `- company: mbio`<br>`  name: Mercedes-Benz.io` |
+| Zoho Recruit | careers pages ending in `/jobs/Careers` | `- name: Edigma`<br>`  url: https://careers.edigma.com/jobs/Careers` |
 
 ## Run it automatically
 

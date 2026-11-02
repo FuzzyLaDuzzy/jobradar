@@ -1,7 +1,7 @@
 """Source connectors. Each `fetch(client, entry, prefilter)` returns a list of Jobs."""
 
-from . import (bamboohr, itjobs, landingjobs, lever, netempregos, randstad, smartrecruiters, successfactors, sysmatch,
-               workday)
+from . import (bamboohr, eurotux, itjobs, landingjobs, lever, netempregos, randstad, recruitee, smartrecruiters,
+               successfactors, sysmatch, workday, zohorecruit)
 from .base import SourceSkipped, make_client
 
 FETCHERS = {
@@ -10,11 +10,14 @@ FETCHERS = {
     "workday": workday.fetch,
     "successfactors": successfactors.fetch,
     "bamboohr": bamboohr.fetch,
+    "recruitee": recruitee.fetch,
+    "zohorecruit": zohorecruit.fetch,
     "itjobs": itjobs.fetch,
     "landingjobs": landingjobs.fetch,
     "netempregos": netempregos.fetch,
     "randstad": randstad.fetch,
     "sysmatch": sysmatch.fetch,
+    "eurotux": eurotux.fetch,
 }
 
 # Which config field names each entry (used in the source label).
@@ -24,11 +27,14 @@ LABEL_FIELD = {
     "workday": "name",
     "successfactors": "name",
     "bamboohr": "name",
+    "recruitee": "company",
+    "zohorecruit": "name",
     "itjobs": None,
     "landingjobs": None,
     "netempregos": None,
     "randstad": None,
     "sysmatch": None,
+    "eurotux": None,
 }
 
 REQUIRED_FIELDS = {
@@ -37,11 +43,14 @@ REQUIRED_FIELDS = {
     "workday": ["url"],
     "successfactors": ["name", "url"],
     "bamboohr": ["name", "site"],
+    "recruitee": ["company"],
+    "zohorecruit": ["name", "url"],
     "itjobs": [],
     "landingjobs": [],
     "netempregos": [],
     "randstad": [],
     "sysmatch": [],
+    "eurotux": [],
 }
 
 

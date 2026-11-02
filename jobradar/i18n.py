@@ -69,6 +69,8 @@ EN = {
     "recebeste por email de itjobs.pt/api.":
         "ITJobs: {message}. Check the key in .env (ITJOBS_API_KEY=..., no spaces or quotes) and that it is the "
         "one itjobs.pt/api emailed you.",
+    "Zoho Recruit: {url} sem a lista de vagas (a página mudou?)":
+        "Zoho Recruit: {url} has no job list (did the page change?)",
     # notify.py
     "1 vaga nova": "1 new job",
     "{n} vagas novas": "{n} new jobs",

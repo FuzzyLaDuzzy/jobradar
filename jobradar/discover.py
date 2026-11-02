@@ -38,6 +38,7 @@ CONFIG = {
     "bamboohr": "  bamboohr:\n    - name: {name}\n      site: {slug}",
     "lever": "  lever:\n    - site: {slug}\n      company: {name}",
     "smartrecruiters": "  smartrecruiters:\n    - company: {slug}\n      country: pt",
+    "recruitee": "  recruitee:\n    - company: {slug}\n      name: {name}",
 }
 _SUFFIXES = {"lda", "sa", "s", "a", "unipessoal", "portugal", "pt", "group", "grupo"}
 

@@ -82,6 +82,18 @@ sources:
       logo: https://www.google.com/s2/favicons?domain=randstad.pt&sz=128
   sysmatch:                   # sysmatch.com/job-opportunities
     - company: Sysmatch
+  # Companies of this example's area (Braga)
+  eurotux:                    # eurotux.com/careers
+    - company: Eurotux
+      logo: https://www.google.com/s2/favicons?domain=eurotux.com&sz=128
+  zohorecruit:                # Zoho Recruit careers sites (careers.<company>.../jobs/Careers)
+    - name: Edigma
+      url: https://careers.edigma.com/jobs/Careers
+      logo: https://www.google.com/s2/favicons?domain=edigma.com&sz=128
+  recruitee:                  # https://<company>.recruitee.com
+    - company: mbio
+      name: Mercedes-Benz.io  # offices in Lisbon and Braga
+      logo: https://www.google.com/s2/favicons?domain=mercedes-benz.io&sz=128
   # Large companies with offices in several cities. Each searches your primary places
   # unless the entry sets its own `search` (Workday) or `location` (SuccessFactors).
   smartrecruiters:            # https://jobs.smartrecruiters.com/<company>
