@@ -1,0 +1,16 @@
+{
+  "name": "JobRadar",
+  "short_name": "JobRadar",
+  "description": "Vagas na tua zona, filtradas e pontuadas para ti",
+  "lang": "pt",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f6f5f1",
+  "theme_color": "#1f6b55",
+  "icons": [
+    {"src": "/static/icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "/static/icon-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "/static/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}

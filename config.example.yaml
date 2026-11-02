@@ -1,0 +1,120 @@
+# JobRadar configuration
+# On first run this file is copied to config.yaml, which is yours (git ignores it).
+# Edit config.yaml here or with the ⚙ button in the app.
+# Accents and capitals are optional everywhere ("estagio" = "Estágio").
+
+language: pt                  # pt = Português, en = English (also the PT/EN button in the app)
+
+profile:
+  # What the AI reads to score each job and to write your messages and interview notes.
+  cv_summary: |
+    Recent graduate in Informatics Engineering (replace with your own summary: degree,
+    main technologies, projects, and the kind of job you are looking for and where).
+  # For the "Write application message" button: your name, the signature as it should
+  # appear, and the facts the AI may use. It never uses anything that isn't written here.
+  # Text in [square brackets] is left for you to fill in.
+  name: Your Name
+  signature: "[Phone] · linkedin.com/in/[you] · github.com/[you]"
+  facts: |
+    - Final project: [what you built, with which technologies, and one concrete result].
+    - [Another project, internship or job, in one line].
+    - Languages: Portuguese (native), English ([level]).
+  # Each of these found in a job adds points.
+  skills: [python, sql, javascript, typescript, react, vue, node, java, c, docker, kubernetes,
+           rest, api, git, linux]
+  # Topics you care most about: worth more points.
+  focus: [ai, llm, machine learning, data engineering, backend]
+
+search:
+  # Your area, written once: these places are accepted, and the sources that search by
+  # place (ITJobs districts, Workday, SuccessFactors) use them too.
+  # "primary" places are searched on company sites and give more points; add the English
+  # name when there is one (e.g. [lisboa, lisbon]).
+  locations_primary: [braga]
+  # Every accepted place. Include your district (e.g. lisboa, porto) so ITJobs finds it.
+  locations: [braga, guimaraes, famalicao, vila nova de famalicao, barcelos, vila verde]
+  allow_remote: false         # true = also accept 100% remote jobs in Portugal
+
+  # Kind of job: the title must contain at least one of these words. Empty list = any job.
+  # This example is for IT; for another area, write that area's job titles.
+  title_keywords: [software, developer, desenvolvedor, programador, programmer, programacao, informatica,
+                   informatics, it, ti, tecnologias de informacao, information systems, sistemas de informacao,
+                   technology, tecnologia, data, dados, analytics, bi, ai, ia, genai, llm, machine learning, ml,
+                   mlops, devops, devsecops, sre, cloud, platform, backend, back-end, frontend, front-end,
+                   full stack, fullstack, full-stack, web, mobile, app, application, aplicacoes, embedded,
+                   security, cybersecurity, ciberseguranca, network, redes, database, sql, python, java,
+                   javascript, .net, golang, qa, quality assurance, tester, testing, test automation, sap, btp,
+                   rpa, salesforce, servicenow, outsystems, dynamics, appian, low-code, workday, erp, crm,
+                   business analyst]
+
+  # Level: words that mark a junior job or internship (they add points)...
+  junior_keywords: [junior, jr, trainee, graduate, entry level, estagio profissional,
+                    estagiario, internship, intern, recem-licenciado, iefp, academy]
+  # ...and job titles with any of these words are skipped. Looking for senior jobs? Empty both lists.
+  exclude_title_keywords: [senior, sr, lead, leader, principal, staff, manager, head,
+                           director, architect, chief, vp, expert]
+
+  # Jobs with these words in the title or contract type are skipped.
+  # In this IT example: school internships, support desks and jobs that only look like IT.
+  exclude_keywords: [curricular, extracurricular, estagio academico, academic internship, dissertacao,
+                     dissertation, help desk, helpdesk, service desk, it support, business developer,
+                     contabilidade, contabilista, accounting, accountant]
+  exclude_companies: []
+  # Typical scam signs.
+  scam_keywords: [accommodation provided, alojamento incluido, passport support,
+                  nao remunerado, unpaid]
+  max_age_days: 120           # skip jobs posted more than N days ago
+
+# Where to look. Run `python -m jobradar discover` to find the companies in your area;
+# the README explains how to add each platform.
+sources:
+  itjobs:                     # needs ITJOBS_API_KEY in .env (free at itjobs.pt/api)
+    - queries: [junior, trainee, estagio, graduate]
+      professional_internships: true   # every professional internship in your area
+      max_pages: 2
+      # every job in your district is read too; to choose districts by id: locations: [4]
+  landingjobs:                # official Landing.jobs feed (the ~60 most recent jobs)
+    - feed: https://landing.jobs/feed
+  netempregos:                # official Net-Empregos RSS: only the last ~24 h, so refresh daily
+    - categories: [Informática]   # site categories to read (the feed has every area)
+  randstad:                   # official Randstad RSS (includes Randstad Digital)
+    - company: Randstad
+      logo: https://www.google.com/s2/favicons?domain=randstad.pt&sz=128
+  sysmatch:                   # sysmatch.com/job-opportunities
+    - company: Sysmatch
+  # Large companies with offices in several cities. Each searches your primary places
+  # unless the entry sets its own `search` (Workday) or `location` (SuccessFactors).
+  smartrecruiters:            # https://jobs.smartrecruiters.com/<company>
+    - company: BoschGroup
+      country: pt
+      logo: https://www.google.com/s2/favicons?domain=bosch.com&sz=128
+  lever:                      # https://jobs.lever.co/<site>
+    - site: farfetch
+      company: FARFETCH
+      logo: https://www.google.com/s2/favicons?domain=farfetch.com&sz=128
+  workday:                    # the company's *.myworkdayjobs.com careers page
+    - name: Accenture
+      url: https://accenture.wd103.myworkdayjobs.com/AccentureCareers
+      logo: https://www.google.com/s2/favicons?domain=accenture.com&sz=128
+  successfactors:             # SAP SuccessFactors careers sites (jobs.<company>...)
+    - name: Deloitte
+      url: https://jobs.deloitte.pt
+      logo: https://www.google.com/s2/favicons?domain=deloitte.com&sz=128
+    # these two only fill their search with JavaScript; the sitemap lists every job
+    - name: EY
+      url: https://careers.ey.com
+      sitemap: true
+      logo: https://www.google.com/s2/favicons?domain=ey.com&sz=128
+    - name: Fujitsu
+      url: https://www.jobs.global.fujitsu.com
+      sitemap: true
+      logo: https://www.google.com/s2/favicons?domain=fujitsu.com&sz=128
+
+scoring:
+  llm:
+    enabled: true             # only runs when the provider's key is in .env
+    # gemini: free (GEMINI_API_KEY, aistudio.google.com) | anthropic: paid (ANTHROPIC_API_KEY)
+    # Default models: gemini-3.5-flash-lite scores, gemini-3.8-flash writes
+    # (anthropic: claude-haiku-5-5 and claude-opus-5-5). To change them: model / message_model.
+    provider: gemini
+    max_jobs_per_refresh: 40  # at most this many new jobs scored by the AI per refresh

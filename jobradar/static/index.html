@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="pt">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>JobRadar</title>
+  <link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/static/manifest.json">
+  <link rel="apple-touch-icon" href="/static/icon-192.png">
+  <meta name="theme-color" content="#1f6b55">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div id="app" v-cloak>
+  <header class="top">
+    <div class="brand">
+      <svg class="logo" viewBox="0 0 32 32" aria-hidden="true">
+        <circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" stroke-width="2" opacity=".35"></circle>
+        <circle cx="16" cy="16" r="8" fill="none" stroke="currentColor" stroke-width="2" opacity=".6"></circle>
+        <path d="M16 16 L27 9" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"></path>
+        <circle cx="22" cy="20" r="2.2" fill="currentColor"></circle>
+      </svg>
+      <div>
+        <h1>JobRadar</h1>
+        <p>{{ t('Vagas na tua zona, filtradas e pontuadas para ti') }}</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <span class="muted small" v-if="lastRefresh">{{ t('Atualizado {when}', { when: relative(lastRefresh) }) }}</span>
+      <button class="btn" @click="openAddJob">{{ t('+ Adicionar vaga') }}</button>
+      <button class="btn primary" :disabled="refreshing" @click="refresh">
+        <span v-if="refreshing" class="spinner"></span>
+        {{ refreshing ? t('A procurar…') : t('Procurar vagas') }}
+      </button>
+      <button class="btn icon" @click="changeLanguage(lang === 'pt' ? 'en' : 'pt')"
+              :aria-label="lang === 'pt' ? 'Switch to English' : 'Mudar para português'">{{ lang === 'pt' ? 'EN' : 'PT' }}</button>
+      <button class="btn icon" @click="setTheme(darkNow ? 'light' : 'dark')"
+              :title="darkNow ? t('Mudar para tema claro') : t('Mudar para tema escuro')"
+              :aria-label="darkNow ? t('Mudar para tema claro') : t('Mudar para tema escuro')">{{ darkNow ? '☀' : '☾' }}</button>
+      <button class="btn icon" @click="openSettings" :title="t('Definições')" :aria-label="t('Definições')">⚙</button>
+    </div>
+  </header>
+
+  <section class="sources" v-if="runs.length">
+    <div v-for="r in runs" :key="r.source" class="source-chip" :class="r.status">
+      <span class="dot"></span>
+      <strong>{{ sourceName(r.source) }}</strong>
+      <span v-if="r.status === 'ok'">{{ t('{kept} relevantes de {fetched}', { kept: r.kept, fetched: r.fetched }) }}<b v-if="r.new">{{ t(' · {n} novas', { n: r.new }) }}</b></span>
+      <span v-else class="msg" :title="r.message">{{ r.status === 'skipped' ? r.message : t('Erro: {error}', { error: r.message }) }}</span>
+    </div>
+  </section>
+
+  <nav class="tabs" :aria-label="t('Estado das vagas')">
+    <button v-for="tb in tabs" :key="tb.key" :class="{ active: tab === tb.key }" @click="tab = tb.key">
+      {{ tb.label }} <span class="count">{{ counts[tb.key] }}</span>
+    </button>
+  </nav>
+
+  <section class="toolbar">
+    <input class="search" type="search" v-model="query" :placeholder="t('Pesquisar título, empresa ou tecnologia…')">
+    <select v-model="source" :aria-label="t('Fonte')">
+      <option value="">{{ t('Todas as fontes') }}</option>
+      <option v-for="s in sources" :key="s" :value="s">{{ sourceName(s) }}</option>
+    </select>
+    <select v-model="sort" :aria-label="t('Ordenar')">
+      <option value="score">{{ t('Melhor encaixe') }}</option>
+      <option value="date">{{ t('Mais recentes') }}</option>
+    </select>
+    <label class="range">
+      {{ t('Encaixe mín.') }}
+      <input type="range" min="0" max="90" step="5" v-model.number="minScore">
+      <b>{{ minScore }}</b>
+    </label>
+    <label class="check"><input type="checkbox" v-model="showInactive"> {{ t('Mostrar indisponíveis') }}</label>
+  </section>
+
+  <main>
+    <p v-if="error" class="alert">{{ error }}</p>
+
+    <div v-if="!loading && jobs.length === 0" class="empty">
+      <h2>{{ t('Ainda não há vagas') }}</h2>
+      <p>{{ t('Carrega em') }} <b>{{ t('Procurar vagas') }}</b> {{ t('para ler todas as fontes configuradas.') }}</p>
+    </div>
+    <div v-else-if="!loading && filtered.length === 0" class="empty">
+      <h2>{{ t('Nenhuma vaga com estes filtros') }}</h2>
+      <p>{{ t('Experimenta baixar o encaixe mínimo ou mudar de separador.') }}</p>
+    </div>
+
+    <article v-for="j in filtered" :key="j.uid" class="card" :class="{ inactive: !j.active, done: j.status === 'candidatei' }">
+      <div class="score" :class="scoreClass(j.score)" :title="scoreTitle(j)">
+        <span>{{ j.score }}</span>
+      </div>
+
+      <div class="body">
+        <div class="title-row">
+          <span class="company-logo" :title="j.company">
+            <img v-if="j.logo && !j.logoFailed" :src="j.logo" alt="" loading="lazy" referrerpolicy="no-referrer"
+                 @error="j.logoFailed = true">
+            <template v-else>{{ initials(j.company || j.title) }}</template>
+          </span>
+          <a :href="j.url" target="_blank" rel="noopener" class="title">{{ j.title }}</a>
+          <span v-if="isNew(j)" class="badge new">{{ t('Nova') }}</span>
+        </div>
+        <div class="meta">
+          <b>{{ j.company }}</b> · {{ j.location || t('Localização por confirmar') }} · {{ posted(j) }}
+        </div>
+        <div class="badges">
+          <span class="badge source">{{ sourceName(j.source) }}</span>
+          <span class="badge" v-if="j.contract">{{ j.contract }}</span>
+          <span class="badge" v-if="j.experience && j.experience.toLowerCase() !== (j.contract || '').toLowerCase()">{{ j.experience }}</span>
+          <span class="badge" v-if="j.work_model">{{ workModel(j.work_model) }}</span>
+          <span class="badge applied" v-if="j.applied_at">{{ t('Candidatei-me a {date}', { date: shortDate(j.applied_at) }) }}</span>
+          <span class="badge warn" v-if="j.flags.years_required >= 2">{{ t('Pede {n}+ anos', { n: j.flags.years_required }) }}</span>
+          <span class="badge warn" v-if="!j.active">{{ t('Já não está publicada') }}</span>
+        </div>
+        <p class="reason" v-if="j.llm_reason">{{ j.llm_reason }}</p>
+        <p class="reason muted" v-else-if="j.reasons.length">{{ j.reasons.map((r) => t(r)).join(' · ') }}</p>
+
+        <details>
+          <summary>{{ t('Descrição e notas') }}</summary>
+          <p class="desc" v-if="j.description">{{ j.description }}</p>
+          <p class="desc muted" v-else>{{ t('Sem descrição. Abre a vaga para ver os detalhes.') }}</p>
+          <textarea v-model="j.notes" @change="saveNotes(j)" :placeholder="t('Notas (ex.: enviei o CV a 30/10, contacto da recrutadora…)')"></textarea>
+          <div class="ai">
+            <div class="ai-actions">
+              <button class="btn" @click="generate(j, 'message')" :disabled="j.messageBusy">
+                <span v-if="j.messageBusy" class="spinner"></span>
+                {{ j.messageBusy ? t('A escrever…') : (j.message ? t('↻ Outra versão da mensagem') : t('✉ Gerar mensagem de candidatura')) }}
+              </button>
+              <button class="btn" @click="generate(j, 'interview')" :disabled="j.interviewBusy">
+                <span v-if="j.interviewBusy" class="spinner"></span>
+                {{ j.interviewBusy ? t('A preparar…') : (j.interview ? t('↻ Preparar de novo') : t('🎯 Preparar entrevista')) }}
+              </button>
+            </div>
+            <template v-for="kind in ['message', 'interview']" :key="kind">
+              <p class="alert" v-if="j[kind + 'Error']">{{ j[kind + 'Error'] }}</p>
+              <template v-if="j[kind]">
+                <textarea class="ai-text" v-model="j[kind]"
+                          :aria-label="kind === 'message' ? t('Rascunho da mensagem') : t('Preparação da entrevista')"></textarea>
+                <button class="btn" @click="copyText(j[kind])">{{ t('Copiar') }}</button>
+              </template>
+            </template>
+          </div>
+        </details>
+      </div>
+
+      <div class="actions">
+        <a class="btn" :href="j.url" target="_blank" rel="noopener">{{ t('Abrir ↗') }}</a>
+        <button class="btn" :class="{ on: j.status === 'guardada' }" @click="setStatus(j, 'guardada')">{{ t('★ Guardar') }}</button>
+        <button class="btn" :class="{ on: j.status === 'candidatei' }" @click="setStatus(j, 'candidatei')">{{ t('✓ Candidatei-me') }}</button>
+        <button class="btn ghost" :class="{ on: j.status === 'descartada' }" @click="setStatus(j, 'descartada')">{{ t('✕ Descartar') }}</button>
+      </div>
+    </article>
+  </main>
+
+  <div class="modal" v-if="settingsOpen" @click.self="settingsOpen = false">
+    <div class="sheet" role="dialog" :aria-label="t('Definições')">
+      <header>
+        <h2>{{ t('Definições') }}</h2>
+        <button class="btn icon" @click="settingsOpen = false" :aria-label="t('Fechar')">✕</button>
+      </header>
+      <div class="keys">
+        <span :class="keys.ITJOBS_API_KEY ? 'ok' : 'missing'">ITJobs: {{ keys.ITJOBS_API_KEY ? t('chave encontrada') : t('falta ITJOBS_API_KEY no .env') }}</span>
+        <span :class="keys.GEMINI_API_KEY || keys.ANTHROPIC_API_KEY ? 'ok' : 'missing'">{{ t('IA (avaliação e mensagens): {state}', { state: keys.GEMINI_API_KEY || keys.ANTHROPIC_API_KEY ? t('chave encontrada') : t('desligada (opcional, GEMINI_API_KEY ou ANTHROPIC_API_KEY)') }) }}</span>
+        <button class="btn" @click="openKeys()">🔑 {{ t('Chaves de API') }}</button>
+      </div>
+      <p class="muted small">{{ t('Edita a zona, o tipo de trabalho, as fontes e o teu perfil. Depois de guardar, carrega em') }} <b>{{ t('Procurar vagas') }}</b>.</p>
+      <textarea class="yaml" v-model="configText" spellcheck="false"></textarea>
+      <p class="alert" v-if="configError">{{ configError }}</p>
+      <footer>
+        <button class="btn" @click="settingsOpen = false">{{ t('Cancelar') }}</button>
+        <button class="btn primary" @click="saveConfig" :disabled="savingConfig">{{ t('Guardar') }}</button>
+      </footer>
+    </div>
+  </div>
+
+  <div class="modal" v-if="addOpen" @click.self="addOpen = false">
+    <form class="sheet form" role="dialog" :aria-label="t('Adicionar vaga')" @submit.prevent="addJob">
+      <header>
+        <h2>{{ t('Adicionar vaga') }}</h2>
+        <button type="button" class="btn icon" @click="addOpen = false" :aria-label="t('Fechar')">✕</button>
+      </header>
+      <p class="muted small">{{ t('Para vagas que encontraste noutro sítio (LinkedIn, um amigo…). Fica nas Guardadas e acompanhas como as outras.') }}</p>
+      <label>{{ t('Título *') }}<input ref="newTitle" v-model="newJob.title" required maxlength="200" :placeholder="t('ex.: Junior Backend Developer')"></label>
+      <label>{{ t('Empresa') }}<input v-model="newJob.company" maxlength="200"></label>
+      <label>{{ t('Link da vaga') }}<input v-model="newJob.url" type="url" maxlength="2000" placeholder="https://www.linkedin.com/jobs/view/…"></label>
+      <label>{{ t('Localização') }}<input v-model="newJob.location" maxlength="200" :placeholder="t('ex.: Lisboa (híbrido)')"></label>
+      <label>{{ t('Notas') }}<textarea v-model="newJob.notes" maxlength="5000"></textarea></label>
+      <p class="alert" v-if="addError">{{ addError }}</p>
+      <footer>
+        <button type="button" class="btn" @click="addOpen = false">{{ t('Cancelar') }}</button>
+        <button type="submit" class="btn primary" :disabled="adding">{{ t('Adicionar') }}</button>
+      </footer>
+    </form>
+  </div>
+
+  <div class="modal" v-if="keysOpen" @click.self="closeKeys">
+    <form class="sheet form" role="dialog" :aria-label="firstRun ? t('Boas-vindas ao JobRadar') : t('Chaves de API')"
+          @submit.prevent="saveKeys">
+      <header>
+        <h2>{{ firstRun ? t('Boas-vindas ao JobRadar') : t('Chaves de API') }}</h2>
+        <button type="button" class="btn icon" @click="closeKeys" :aria-label="t('Fechar')">✕</button>
+      </header>
+      <template v-if="firstRun">
+        <div class="choice" role="group" aria-label="Língua / Language">
+          <span class="small">Língua / Language</span>
+          <button type="button" class="btn" :class="{ on: lang === 'pt' }" lang="pt" @click="changeLanguage('pt')">Português</button>
+          <button type="button" class="btn" :class="{ on: lang === 'en' }" lang="en" @click="changeLanguage('en')">English</button>
+        </div>
+        <div class="choice" role="group" :aria-label="t('Tema')">
+          <span class="small">{{ t('Tema') }}</span>
+          <button type="button" class="btn" :class="{ on: !darkNow }" @click="setTheme('light')">☀ {{ t('Claro') }}</button>
+          <button type="button" class="btn" :class="{ on: darkNow }" @click="setTheme('dark')">☾ {{ t('Escuro') }}</button>
+        </div>
+        <p class="muted small">{{ t('O JobRadar procura vagas na tua zona em vários sites. Algumas fontes e a IA precisam de uma chave de API: junta as que quiseres, todas são opcionais.') }}</p>
+      </template>
+      <p class="muted small">{{ t('As chaves ficam só no ficheiro .env deste computador e a app nunca as mostra.') }}</p>
+      <section v-for="g in keyGuides" :key="g.key" class="key-card">
+        <div class="key-head">
+          <strong>{{ g.name }}</strong>
+          <span class="badge" :class="keyStatus[g.key] ? 'applied' : 'warn'">{{ keyStatus[g.key] ? t('configurada') : t('em falta') }}</span>
+        </div>
+        <p class="small">{{ t(g.what) }}</p>
+        <ol class="small"><li v-for="step in g.steps" :key="step">{{ t(step) }}</li></ol>
+        <a class="btn" :href="g.url" target="_blank" rel="noopener">{{ t('Abrir {site} ↗', { site: g.site }) }}</a>
+        <label>{{ g.key }}
+          <input v-model="newKeys[g.key]" type="password" autocomplete="off" spellcheck="false" maxlength="300"
+                 :placeholder="keyStatus[g.key] ? t('Já configurada: cola outra para a substituir') : t('Cola aqui a chave')">
+        </label>
+      </section>
+      <p class="muted small" v-if="firstRun">{{ t('Depois, escolhe a tua zona, o tipo de trabalho e o teu perfil no ⚙.') }}</p>
+      <p class="alert" v-if="keysError">{{ keysError }}</p>
+      <footer>
+        <button type="button" class="btn" @click="closeKeys">{{ firstRun ? t('Agora não') : t('Cancelar') }}</button>
+        <button type="submit" class="btn primary" :disabled="savingKeys">{{ t('Guardar chaves') }}</button>
+      </footer>
+    </form>
+  </div>
+
+  <div class="toast" v-if="toast">{{ toast }}</div>
+</div>
+<script src="/static/vue.global.prod.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,604 @@
+const { createApp } = Vue;
+
+const STORAGE_KEY = "jobradar.filters";
+const SOURCE_NAMES = {
+  itjobs: "ITJobs", sysmatch: "Sysmatch", landingjobs: "Landing.jobs", netempregos: "Net-Empregos", randstad: "Randstad",
+  manual: "Adicionada por ti",
+};
+const WORK_MODELS = { remote: "Remoto", hybrid: "Híbrido", "on-site": "Presencial", onsite: "Presencial" };
+const EMPTY_JOB = () => ({ title: "", company: "", url: "", location: "", notes: "" });
+const WELCOME_KEY = "jobradar.welcomed";
+const THEME_KEY = "jobradar.theme"; // "light" or "dark"; none = follow the system (style.css)
+
+function savedTheme() {
+  try {
+    return localStorage.getItem(THEME_KEY) || "";
+  } catch {
+    return "";
+  }
+}
+document.documentElement.dataset.theme = savedTheme(); // before Vue mounts, so the page never flashes
+// The API keys and how to get each one (welcome screen, and 🔑 in the settings).
+const KEY_GUIDES = [
+  {
+    key: "ITJOBS_API_KEY", name: "ITJobs.pt", url: "https://www.itjobs.pt/api", site: "itjobs.pt/api",
+    what: "Liga a fonte ITJobs.pt, o maior site de emprego em informática em Portugal. Grátis.",
+    steps: [
+      "Abre itjobs.pt/api.",
+      "Na secção «API Key», escreve o teu email e carrega em «Submit».",
+      "A chave chega por email: cola-a aqui.",
+    ],
+  },
+  {
+    key: "GEMINI_API_KEY", name: "Google Gemini", url: "https://aistudio.google.com/apikey", site: "aistudio.google.com",
+    what: "IA grátis: avalia cada vaga, escreve a mensagem de candidatura e prepara a entrevista. Opcional.",
+    steps: [
+      "Abre aistudio.google.com/apikey e entra com a tua conta Google.",
+      "Carrega em «Create API key» (se pedir, aceita os termos e escolhe ou cria um projeto).",
+      "Copia a chave e cola-a aqui. O plano grátis tem limites por minuto e por dia.",
+    ],
+  },
+  {
+    key: "ANTHROPIC_API_KEY", name: "Anthropic (Claude)", url: "https://console.anthropic.com/settings/keys",
+    site: "console.anthropic.com",
+    what: "Alternativa paga ao Gemini. Opcional.",
+    steps: [
+      "Abre console.anthropic.com, cria uma conta e junta créditos em «Billing».",
+      "Em «API keys», carrega em «Create Key» e copia a chave.",
+      "Cola-a aqui e, no ⚙, muda scoring.llm.provider para anthropic.",
+    ],
+  },
+];
+const EMPTY_KEYS = () => Object.fromEntries(KEY_GUIDES.map((g) => [g.key, ""]));
+
+// Texts are written in Portuguese and looked up here by that same text (like jobradar/i18n.py);
+// a missing one shows in Portuguese. tests/test_i18n.py checks every t("...") has its English.
+const EN = {
+  // header and source chips
+  "Vagas na tua zona, filtradas e pontuadas para ti": "Jobs in your area, filtered and scored for you",
+  "Atualizado {when}": "Updated {when}",
+  "+ Adicionar vaga": "+ Add job",
+  "A procurar…": "Searching…",
+  "Procurar vagas": "Find jobs",
+  "Definições": "Settings",
+  "{kept} relevantes de {fetched}": "{kept} relevant of {fetched}",
+  " · {n} novas": " · {n} new",
+  "Erro: {error}": "Error: {error}",
+  // tabs and toolbar
+  "Estado das vagas": "Job status",
+  "Todas": "All", "Novas": "New", "Guardadas": "Saved", "Candidaturas": "Applied", "Descartadas": "Discarded",
+  "Pesquisar título, empresa ou tecnologia…": "Search title, company or technology…",
+  "Fonte": "Source",
+  "Todas as fontes": "All sources",
+  "Ordenar": "Sort",
+  "Melhor encaixe": "Best fit",
+  "Mais recentes": "Most recent",
+  "Encaixe mín.": "Min. fit",
+  "Mostrar indisponíveis": "Show unavailable",
+  // job list
+  "Ainda não há vagas": "No jobs yet",
+  "Carrega em": "Press",
+  "para ler todas as fontes configuradas.": "to read every source you set up.",
+  "Nenhuma vaga com estes filtros": "No jobs match these filters",
+  "Experimenta baixar o encaixe mínimo ou mudar de separador.": "Try a lower minimum fit or another tab.",
+  "Nova": "New",
+  "Localização por confirmar": "Location to be confirmed",
+  "Candidatei-me a {date}": "Applied on {date}",
+  "Pede {n}+ anos": "Asks for {n}+ years",
+  "Já não está publicada": "No longer published",
+  "Descrição e notas": "Description and notes",
+  "Sem descrição. Abre a vaga para ver os detalhes.": "No description. Open the job to see the details.",
+  "Notas (ex.: enviei o CV a 30/10, contacto da recrutadora…)": "Notes (e.g. sent my CV on 30/10, the recruiter's contact…)",
+  "A escrever…": "Writing…",
+  "↻ Outra versão da mensagem": "↻ Another version of the message",
+  "✉ Gerar mensagem de candidatura": "✉ Write application message",
+  "A preparar…": "Preparing…",
+  "↻ Preparar de novo": "↻ Prepare again",
+  "🎯 Preparar entrevista": "🎯 Prepare for the interview",
+  "Rascunho da mensagem": "Message draft",
+  "Preparação da entrevista": "Interview preparation",
+  "Copiar": "Copy",
+  "Abrir ↗": "Open ↗",
+  "★ Guardar": "★ Save",
+  "✓ Candidatei-me": "✓ Applied",
+  "✕ Descartar": "✕ Discard",
+  // settings and add job
+  "Fechar": "Close",
+  "chave encontrada": "key found",
+  "falta ITJOBS_API_KEY no .env": "ITJOBS_API_KEY missing from .env",
+  "IA (avaliação e mensagens): {state}": "AI (scoring and messages): {state}",
+  "desligada (opcional, GEMINI_API_KEY ou ANTHROPIC_API_KEY)": "off (optional, GEMINI_API_KEY or ANTHROPIC_API_KEY)",
+  "Edita a zona, o tipo de trabalho, as fontes e o teu perfil. Depois de guardar, carrega em":
+    "Edit your area, kind of job, sources and profile. After saving, press",
+  "Cancelar": "Cancel",
+  "Guardar": "Save",
+  "Adicionar vaga": "Add job",
+  "Para vagas que encontraste noutro sítio (LinkedIn, um amigo…). Fica nas Guardadas e acompanhas como as outras.":
+    "For jobs you found somewhere else (LinkedIn, a friend…). It goes to Saved and you track it like the others.",
+  "Título *": "Title *",
+  "ex.: Junior Backend Developer": "e.g. Junior Backend Developer",
+  "Empresa": "Company",
+  "Link da vaga": "Job link",
+  "Localização": "Location",
+  "ex.: Lisboa (híbrido)": "e.g. Lisbon (hybrid)",
+  "Notas": "Notes",
+  "Adicionar": "Add",
+  // app.js
+  "Adicionada por ti": "Added by you",
+  "Remoto": "Remote", "Híbrido": "Hybrid", "Presencial": "On-site",
+  "Erro {code}": "Error {code}",
+  "Não foi possível carregar as vagas: {error}": "Couldn't load the jobs: {error}",
+  "{n} vagas novas encontradas": "{n} new jobs found",
+  "Sem vagas novas desde a última procura": "No new jobs since the last search",
+  "Não foi possível guardar: {error}": "Couldn't save: {error}",
+  "Notas guardadas": "Notes saved",
+  "Não foi possível guardar as notas: {error}": "Couldn't save the notes: {error}",
+  "Não foi possível gerar: {error}": "Couldn't generate: {error}",
+  "Copiado": "Copied",
+  "Não foi possível copiar: seleciona o texto e usa Ctrl+C": "Couldn't copy: select the text and press Ctrl+C",
+  "Vaga adicionada às Guardadas": "Job added to Saved",
+  "Não foi possível adicionar: {error}": "Couldn't add: {error}",
+  "Definições guardadas": "Settings saved",
+  "Não foi possível mudar a língua: {error}": "Couldn't change the language: {error}",
+  "Palavras-chave: {n}": "Keywords: {n}",
+  "Avaliação IA: {n}": "AI score: {n}",
+  "agora mesmo": "just now",
+  "há {n} min": "{n} min ago",
+  "há {n} h": "{n} h ago",
+  "ontem": "yesterday",
+  "há {n} dias": "{n} days ago",
+  "data desconhecida": "unknown date",
+  "publicada hoje": "posted today",
+  "publicada ontem": "posted yesterday",
+  "publicada há {n} dias": "posted {n} days ago",
+  // welcome screen and API keys
+  "Boas-vindas ao JobRadar": "Welcome to JobRadar",
+  "Chaves de API": "API keys",
+  "O JobRadar procura vagas na tua zona em vários sites. Algumas fontes e a IA precisam de uma chave de API: junta as que quiseres, todas são opcionais.":
+    "JobRadar looks for jobs in your area on several sites. Some sources and the AI need an API key: add the ones you want, they're all optional.",
+  "As chaves ficam só no ficheiro .env deste computador e a app nunca as mostra.":
+    "The keys stay only in the .env file on this computer, and the app never shows them.",
+  "configurada": "set",
+  "em falta": "missing",
+  "Abrir {site} ↗": "Open {site} ↗",
+  "Já configurada: cola outra para a substituir": "Already set: paste another one to replace it",
+  "Cola aqui a chave": "Paste the key here",
+  "Depois, escolhe a tua zona, o tipo de trabalho e o teu perfil no ⚙.":
+    "Then choose your area, the kind of job and your profile with ⚙.",
+  "Agora não": "Not now",
+  "Tema": "Theme",
+  "Claro": "Light",
+  "Escuro": "Dark",
+  "Mudar para tema claro": "Switch to light theme",
+  "Mudar para tema escuro": "Switch to dark theme",
+  "Guardar chaves": "Save keys",
+  "Chaves guardadas": "Keys saved",
+  "Não foi possível guardar as chaves: {error}": "Couldn't save the keys: {error}",
+  "Liga a fonte ITJobs.pt, o maior site de emprego em informática em Portugal. Grátis.":
+    "Turns on the ITJobs.pt source, the largest IT job board in Portugal. Free.",
+  "Abre itjobs.pt/api.": "Open itjobs.pt/api.",
+  "Na secção «API Key», escreve o teu email e carrega em «Submit».": "In the “API Key” section, type your email and press “Submit”.",
+  "A chave chega por email: cola-a aqui.": "The key arrives by email: paste it here.",
+  "IA grátis: avalia cada vaga, escreve a mensagem de candidatura e prepara a entrevista. Opcional.":
+    "Free AI: scores each job, writes the application message and prepares the interview. Optional.",
+  "Abre aistudio.google.com/apikey e entra com a tua conta Google.": "Open aistudio.google.com/apikey and sign in with your Google account.",
+  "Carrega em «Create API key» (se pedir, aceita os termos e escolhe ou cria um projeto).":
+    "Press “Create API key” (if asked, accept the terms and choose or create a project).",
+  "Copia a chave e cola-a aqui. O plano grátis tem limites por minuto e por dia.":
+    "Copy the key and paste it here. The free tier has limits per minute and per day.",
+  "Alternativa paga ao Gemini. Opcional.": "Paid alternative to Gemini. Optional.",
+  "Abre console.anthropic.com, cria uma conta e junta créditos em «Billing».":
+    "Open console.anthropic.com, create an account and add credits under “Billing”.",
+  "Em «API keys», carrega em «Create Key» e copia a chave.": "Under “API keys”, press “Create Key” and copy the key.",
+  "Cola-a aqui e, no ⚙, muda scoring.llm.provider para anthropic.":
+    "Paste it here and, with ⚙, change scoring.llm.provider to anthropic.",
+  // score reasons, stored in Portuguese by jobradar/scoring.py
+  "júnior/estágio": "junior/internship",
+  "estágio profissional": "professional internship",
+  "zona preferida": "preferred area",
+};
+
+function loadFilters() {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+createApp({
+  data() {
+    const saved = loadFilters();
+    return {
+      lang: "pt",
+      theme: savedTheme(),
+      systemDark: window.matchMedia("(prefers-color-scheme: dark)").matches,
+      jobs: [],
+      runs: [],
+      loading: true,
+      refreshing: false,
+      error: "",
+      tab: saved.tab || "todas",
+      query: saved.query || "",
+      source: saved.source || "",
+      minScore: saved.minScore ?? 0,
+      sort: saved.sort || "score",
+      showInactive: saved.showInactive || false,
+      settingsOpen: false,
+      configText: "",
+      configError: "",
+      keys: {},
+      savingConfig: false,
+      addOpen: false,
+      newJob: EMPTY_JOB(),
+      addError: "",
+      adding: false,
+      keyGuides: KEY_GUIDES,
+      keyStatus: {},
+      keysOpen: false,
+      firstRun: false,
+      newKeys: EMPTY_KEYS(),
+      keysError: "",
+      savingKeys: false,
+      toast: "",
+    };
+  },
+
+  computed: {
+    darkNow() {
+      return this.theme ? this.theme === "dark" : this.systemDark;
+    },
+    tabs() {
+      return [
+        { key: "todas", label: this.t("Todas") },
+        { key: "nova", label: this.t("Novas") },
+        { key: "guardada", label: this.t("Guardadas") },
+        { key: "candidatei", label: this.t("Candidaturas") },
+        { key: "descartada", label: this.t("Descartadas") },
+      ];
+    },
+    visible() {
+      return this.jobs.filter((j) => this.showInactive || j.active || j.status === "candidatei");
+    },
+    counts() {
+      const c = { todas: 0, nova: 0, guardada: 0, candidatei: 0, descartada: 0 };
+      for (const j of this.visible) {
+        c[j.status] = (c[j.status] || 0) + 1;
+        if (j.status !== "descartada") c.todas++;
+      }
+      return c;
+    },
+    sources() {
+      return [...new Set(this.jobs.map((j) => j.source))].sort();
+    },
+    lastRefresh() {
+      const times = this.runs.map((r) => r.finished_at).filter(Boolean).sort();
+      return times.length ? times[times.length - 1] : null;
+    },
+    filtered() {
+      const q = this.normalize(this.query);
+      let list = this.visible.filter((j) => {
+        if (this.tab === "todas" ? j.status === "descartada" : j.status !== this.tab) return false;
+        if (this.source && j.source !== this.source) return false;
+        if (j.score < this.minScore) return false;
+        if (q) {
+          const hay = this.normalize([j.title, j.company, j.location, j.description, j.contract].join(" "));
+          if (!q.split(/\s+/).every((w) => hay.includes(w))) return false;
+        }
+        return true;
+      });
+      const byDate = (a, b) => (b.posted_at || b.first_seen || "").localeCompare(a.posted_at || a.first_seen || "");
+      list.sort(this.sort === "date" ? byDate : (a, b) => b.score - a.score || byDate(a, b));
+      return list;
+    },
+  },
+
+  watch: {
+    tab: "persist", query: "persist", source: "persist", minScore: "persist", sort: "persist", showInactive: "persist",
+  },
+
+  methods: {
+    t(text, values = {}) {
+      const s = (this.lang === "en" && EN[text]) || text;
+      return s.replace(/\{(\w+)\}/g, (m, key) => (key in values ? values[key] : m));
+    },
+
+    persist() {
+      const { tab, query, source, minScore, sort, showInactive } = this;
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ tab, query, source, minScore, sort, showInactive }));
+      } catch {
+        /* storage unavailable: filters just won't be remembered */
+      }
+    },
+
+    async api(path, options = {}) {
+      const res = await fetch(path, {
+        headers: { "Content-Type": "application/json" },
+        ...options,
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        // validation errors (422) come as a list: keep only the messages
+        const detail = Array.isArray(body.detail)
+          ? body.detail.map((d) => d.msg.replace(/^Value error, /, "")).join("; ")
+          : body.detail;
+        throw new Error(detail || this.t("Erro {code}", { code: res.status }));
+      }
+      return body;
+    },
+
+    setLang(lang) {
+      this.lang = lang;
+      document.documentElement.lang = lang;
+    },
+
+    async loadLanguage() {
+      try {
+        this.setLang((await this.api("/api/language")).language);
+      } catch {
+        /* keep Portuguese */
+      }
+    },
+
+    async changeLanguage(language) {
+      try {
+        this.setLang((await this.api("/api/language", { method: "PUT", body: JSON.stringify({ language }) })).language);
+      } catch (e) {
+        this.showToast(this.t("Não foi possível mudar a língua: {error}", { error: e.message }));
+      }
+    },
+
+    // only this browser remembers it: it's how the screen looks, not a search setting
+    setTheme(theme) {
+      this.theme = theme;
+      document.documentElement.dataset.theme = theme;
+      try {
+        localStorage.setItem(THEME_KEY, theme);
+      } catch {
+        /* storage unavailable: back to the system's theme next time */
+      }
+    },
+
+    async load() {
+      try {
+        [this.jobs, this.runs] = await Promise.all([this.api("/api/jobs"), this.api("/api/runs")]);
+        this.error = "";
+      } catch (e) {
+        this.error = this.t("Não foi possível carregar as vagas: {error}", { error: e.message });
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    async refresh() {
+      this.refreshing = true;
+      this.error = "";
+      try {
+        const { runs } = await this.api("/api/refresh", { method: "POST" });
+        const fresh = runs.reduce((n, r) => n + (r.new || 0), 0);
+        await this.load();
+        this.showToast(fresh ? this.t("{n} vagas novas encontradas", { n: fresh }) : this.t("Sem vagas novas desde a última procura"));
+      } catch (e) {
+        this.error = e.message;
+      } finally {
+        this.refreshing = false;
+      }
+    },
+
+    async setStatus(job, status) {
+      const next = job.status === status ? "nova" : status;
+      const previous = job.status;
+      job.status = next;
+      try {
+        await this.api(`/api/jobs/${encodeURIComponent(job.uid)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ status: next }),
+        });
+      } catch (e) {
+        job.status = previous;
+        this.showToast(this.t("Não foi possível guardar: {error}", { error: e.message }));
+      }
+    },
+
+    async saveNotes(job) {
+      try {
+        await this.api(`/api/jobs/${encodeURIComponent(job.uid)}`, {
+          method: "PATCH",
+          body: JSON.stringify({ notes: job.notes }),
+        });
+        this.showToast(this.t("Notas guardadas"));
+      } catch (e) {
+        this.showToast(this.t("Não foi possível guardar as notas: {error}", { error: e.message }));
+      }
+    },
+
+    // kind: "message" (application message) or "interview" (interview prep), same endpoint name
+    async generate(job, kind) {
+      job[kind + "Busy"] = true;
+      job[kind + "Error"] = "";
+      try {
+        const { text } = await this.api(`/api/jobs/${encodeURIComponent(job.uid)}/${kind}`, { method: "POST" });
+        job[kind] = text;
+      } catch (e) {
+        job[kind + "Error"] = this.t("Não foi possível gerar: {error}", { error: e.message });
+      } finally {
+        job[kind + "Busy"] = false;
+      }
+    },
+
+    async copyText(text) {
+      try {
+        await navigator.clipboard.writeText(text);
+        this.showToast(this.t("Copiado"));
+      } catch {
+        this.showToast(this.t("Não foi possível copiar: seleciona o texto e usa Ctrl+C"));
+      }
+    },
+
+    shortDate(iso) {
+      return new Date(iso).toLocaleDateString(this.lang === "en" ? "en-GB" : "pt-PT");
+    },
+
+    openAddJob() {
+      this.newJob = EMPTY_JOB();
+      this.addError = "";
+      this.addOpen = true;
+      this.$nextTick(() => this.$refs.newTitle?.focus());
+    },
+
+    async addJob() {
+      this.adding = true;
+      this.addError = "";
+      try {
+        await this.api("/api/jobs", { method: "POST", body: JSON.stringify(this.newJob) });
+        this.addOpen = false;
+        await this.load();
+        this.showToast(this.t("Vaga adicionada às Guardadas"));
+      } catch (e) {
+        this.addError = this.t("Não foi possível adicionar: {error}", { error: e.message });
+      } finally {
+        this.adding = false;
+      }
+    },
+
+    // First run: no key set and the welcome screen never closed on this browser.
+    async checkWelcome() {
+      try {
+        this.keyStatus = await this.api("/api/keys");
+      } catch {
+        return;
+      }
+      let welcomed = false;
+      try {
+        welcomed = localStorage.getItem(WELCOME_KEY) === "1";
+      } catch {
+        /* storage unavailable: show it while no key is set */
+      }
+      if (!welcomed && !Object.values(this.keyStatus).some(Boolean)) this.openKeys(true);
+    },
+
+    openKeys(firstRun = false) {
+      this.settingsOpen = false;
+      this.firstRun = firstRun;
+      this.newKeys = EMPTY_KEYS();
+      this.keysError = "";
+      this.keysOpen = true;
+    },
+
+    closeKeys() {
+      this.keysOpen = false;
+      try {
+        localStorage.setItem(WELCOME_KEY, "1");
+      } catch {
+        /* the welcome screen will show again next time */
+      }
+    },
+
+    async saveKeys() {
+      this.savingKeys = true;
+      this.keysError = "";
+      try {
+        this.keyStatus = await this.api("/api/keys", { method: "PUT", body: JSON.stringify(this.newKeys) });
+        this.keys = this.keyStatus;
+        this.newKeys = EMPTY_KEYS(); // never keep a key in the page longer than needed
+        this.closeKeys();
+        this.showToast(this.t("Chaves guardadas"));
+      } catch (e) {
+        this.keysError = this.t("Não foi possível guardar as chaves: {error}", { error: e.message });
+      } finally {
+        this.savingKeys = false;
+      }
+    },
+
+    async openSettings() {
+      this.configError = "";
+      try {
+        const data = await this.api("/api/config");
+        this.configText = data.yaml;
+        this.keys = data.keys;
+        this.settingsOpen = true;
+      } catch (e) {
+        this.error = e.message;
+      }
+    },
+
+    async saveConfig() {
+      this.savingConfig = true;
+      this.configError = "";
+      try {
+        await this.api("/api/config", { method: "PUT", body: JSON.stringify({ yaml: this.configText }) });
+        this.settingsOpen = false;
+        await this.loadLanguage(); // the language may have been changed in the file
+        this.showToast(this.t("Definições guardadas"));
+      } catch (e) {
+        this.configError = e.message;
+      } finally {
+        this.savingConfig = false;
+      }
+    },
+
+    showToast(message) {
+      this.toast = message;
+      clearTimeout(this._toastTimer);
+      this._toastTimer = setTimeout(() => (this.toast = ""), 3500);
+    },
+
+    normalize(text) {
+      return (text || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+    },
+
+    sourceName(source) {
+      if (SOURCE_NAMES[source]) return this.t(SOURCE_NAMES[source]);
+      const value = source.split(":").slice(1).join(":") || source;
+      const name = value.replace(/Group$/, "").replace(/_/g, " ");
+      return name.charAt(0).toUpperCase() + name.slice(1);
+    },
+
+    scoreClass(score) {
+      return score >= 70 ? "high" : score >= 45 ? "mid" : "low";
+    },
+
+    scoreTitle(job) {
+      const parts = [this.t("Palavras-chave: {n}", { n: job.kw_score })];
+      if (job.llm_score != null) parts.push(this.t("Avaliação IA: {n}", { n: job.llm_score }));
+      return parts.join(" · ");
+    },
+
+    isNew(job) {
+      if (job.status !== "nova" || !job.first_seen) return false;
+      return Date.now() - new Date(job.first_seen).getTime() < 48 * 3600 * 1000;
+    },
+
+    relative(iso) {
+      const diff = (Date.now() - new Date(iso).getTime()) / 1000;
+      if (diff < 60) return this.t("agora mesmo");
+      if (diff < 3600) return this.t("há {n} min", { n: Math.round(diff / 60) });
+      if (diff < 86400) return this.t("há {n} h", { n: Math.round(diff / 3600) });
+      const days = Math.round(diff / 86400);
+      return days === 1 ? this.t("ontem") : this.t("há {n} dias", { n: days });
+    },
+
+    posted(job) {
+      if (!job.posted_at) return this.t("data desconhecida");
+      const days = Math.floor((Date.now() - new Date(job.posted_at + "T12:00:00").getTime()) / 86400000);
+      if (days <= 0) return this.t("publicada hoje");
+      if (days === 1) return this.t("publicada ontem");
+      return this.t("publicada há {n} dias", { n: days });
+    },
+
+    workModel(value) {
+      return WORK_MODELS[value] ? this.t(WORK_MODELS[value]) : value;
+    },
+
+    initials(company) {
+      return (company || "?").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+    },
+  },
+
+  mounted() {
+    this.loadLanguage();
+    this.load();
+    this.checkWelcome();
+  },
+}).mount("#app");

@@ -1,0 +1,180 @@
+# JobRadar
+
+A local app that finds jobs in your area of Portugal across job boards and company careers sites, keeps the ones that match the kind of job and level you want, scores each one against your profile, and helps you track your applications. It runs on your own computer, in Portuguese or English.
+
+![JobRadar](docs/screenshot.png)
+
+## What it does
+
+- **Reads many sources** through the public APIs and feeds that the sites themselves publish:
+  - **ITJobs.pt**, the main Portuguese IT job board (free read-only key)
+  - **Landing.jobs**, **Net-Empregos** and **Randstad**, through their official feeds
+  - **Sysmatch**, from its jobs page
+  - **Company careers sites** on SmartRecruiters, Lever, Workday, SAP SuccessFactors and BambooHR (Bosch, Farfetch, Accenture, Deloitte, EY, Fujitsu… or any company you add)
+- **Filters** by your area, the kind of job (words the title must have), your level (junior words, senior words to skip), excluded words and companies, job age and typical scam signs. When a source doesn't say where the job is, it looks for the city in the description.
+- **Scores each job from 0 to 100** from keywords (level, area, your skills and interests), with a penalty for jobs that ask for 3+ years. With an AI key, an LLM also scores each new job against your profile and writes one sentence on why.
+- **Writes a draft application message** (✉) in the posting's language, using only the facts in your profile, and honest about what you're missing.
+- **Prepares you for the interview** (🎯): what the job is looking for, likely technical and behavioural questions with hints from your profile, your gaps against the posting, and questions to ask the company.
+- **Tracks your applications**: mark jobs as saved, applied (with the date) or discarded, and write notes. Jobs you find elsewhere (LinkedIn, a friend…) can be added by hand.
+- **Spots jobs that closed**: when a job disappears from its source, it's marked as no longer published.
+- **Português or English**: the PT/EN button changes the whole app, the error messages and what the AI writes for you.
+- **Light or dark**: the ☀/☾ button (until you choose, it follows your system).
+
+## Install and run
+
+You need Python 3.10 or later.
+
+**Windows (PowerShell):**
+
+```powershell
+git clone https://github.com/FuzzyLaDuzzy/jobradar.git
+cd jobradar
+python -m venv .venv
+.venv\Scripts\Activate.ps1          # if this fails: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+pip install -r requirements.txt
+Copy-Item .env.example .env         # then fill in the keys you have (all optional)
+python -m jobradar                  # opens http://127.0.0.1:8000
+```
+
+**macOS / Linux:**
+
+```bash
+git clone https://github.com/FuzzyLaDuzzy/jobradar.git
+cd jobradar
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+python -m jobradar
+```
+
+The first run creates `config.yaml` from [`config.example.yaml`](config.example.yaml). That file is yours: git ignores it, so updating JobRadar never touches your settings. Set your area, the kind of job and your profile (next section), then press **Find jobs**. The first search takes about a minute, because JobRadar reads the full description of every job that passes the first filter.
+
+## Set it up for you
+
+Everything is in `config.yaml`, which you can also edit with the ⚙ button in the app.
+
+| Setting | What it does |
+|---|---|
+| `language` | `pt` or `en` (the same as the PT/EN button) |
+| `search.locations_primary` | Your main place(s). Company sites are searched for these, and jobs there get more points. Add the English name when there is one: `[lisboa, lisbon]` |
+| `search.locations` | Every place you accept, e.g. `[lisboa, lisbon, oeiras, amadora, sintra]`. Include your district so ITJobs finds it |
+| `search.allow_remote` | `true` to also accept fully remote jobs in Portugal |
+| `search.title_keywords` | The kind of job: the title must contain one of these words. The example is for IT; empty list = any job |
+| `search.junior_keywords` / `exclude_title_keywords` | Your level: words that mark a junior job (they add points), and title words to skip (senior, lead…) |
+| `search.exclude_keywords` / `exclude_companies` | Jobs and companies to ignore |
+| `search.max_age_days` | Skip jobs older than this |
+| `profile` | Your summary, skills and interests (for the score), plus your name, signature and the facts the AI may use in messages |
+| `sources` | Where to look (see below) |
+
+Your area is written only once: ITJobs, Workday and SuccessFactors take it from `search`, unless an entry sets its own (`locations` with ITJobs district ids, `search` on Workday, `location` on SuccessFactors).
+
+### Keys (`.env`)
+
+The first time you open JobRadar, a welcome screen lets you pick the language and a light or dark theme, explains how to get each key and saves the ones you paste to `.env` (they never leave your computer, and the app never shows them again). You can come back to it with ⚙ → 🔑 API keys, or edit `.env` yourself.
+
+![Welcome screen](docs/welcome.png)
+
+| Variable | What for | Where |
+|---|---|---|
+| `ITJOBS_API_KEY` | The ITJobs.pt source | Free at <https://www.itjobs.pt/api> (sent by email) |
+| `GEMINI_API_KEY` | Free AI: scores each job, writes messages and interview notes | <https://aistudio.google.com/apikey> |
+| `ANTHROPIC_API_KEY` | The same with Claude, paid (`scoring.llm.provider: anthropic`) | <https://console.anthropic.com> |
+
+Without keys, every source except ITJobs works, and scores use keywords only. With Gemini, JobRadar scores with `gemini-3.5-flash-lite` and writes with `gemini-3.8-flash`; with Anthropic, Claude Haiku 5.5 and Opus 5.5. The free Gemini tier has rate limits: jobs it couldn't score are scored on the next refresh. Read Google's terms for how free-tier requests may be used in your region. Always review what the AI writes before sending it.
+
+### Find the companies in your area
+
+```bash
+python -m jobradar discover                         # companies already seen in your area
+python -m jobradar discover "Company A" "Company B" # plus these names
+```
+
+It takes the companies that already showed up with jobs in your area (plus any names you give), checks nine careers platforms with a public API (BambooHR, Lever, SmartRecruiters, Greenhouse, Workable, Ashby, Recruitee, Personio, Breezy), says whether the answer mentions your place, and prints the lines to add to `config.yaml`. Watch out for short names: they may match another company with the same name.
+
+To add a company by hand, open one of its job pages and look at the domain of the apply link:
+
+| Platform | Its identifier | In `config.yaml` |
+|---|---|---|
+| SmartRecruiters | `jobs.smartrecruiters.com/<id>` (case matters) | `- company: BoschGroup`<br>`  country: pt` |
+| Lever | `jobs.lever.co/<site>` | `- site: farfetch` |
+| Workday | the careers page, `*.myworkdayjobs.com/<Site>` | `- name: Accenture`<br>`  url: https://accenture.wd103.myworkdayjobs.com/AccentureCareers` |
+| SAP SuccessFactors | sites like `jobs.<company>...` with a `/search/` page; if the search only works in a browser, `sitemap: true` reads the jobs from `sitemap.xml` | `- name: Deloitte`<br>`  url: https://jobs.deloitte.pt` |
+| BambooHR | `<site>.bamboohr.com/careers` | `- name: Uphold`<br>`  site: uphold` |
+
+## Run it automatically
+
+`python -m jobradar refresh` runs a search without the interface and prints a summary per source. Net-Empregos only keeps about 24 hours of jobs, so it pays to refresh every day. Each `refresh` first saves a **backup** of the database to `backups/jobradar-YYYY-MM-DD.db` and keeps the last 7. To restore one, close the app and copy it over `jobradar.db`.
+
+**macOS / Linux (cron)**, every day at 9:00 and 21:00:
+
+```cron
+0 9,21 * * *  cd /path/to/jobradar && .venv/bin/python -m jobradar refresh >> jobradar.log 2>&1
+```
+
+**Windows (Task Scheduler)**, from the project folder in PowerShell:
+
+```powershell
+$python = (Resolve-Path .venv\Scripts\pythonw.exe).Path
+$action = New-ScheduledTaskAction -Execute $python -Argument "-m jobradar refresh" -WorkingDirectory (Get-Location).Path
+$triggers = @((New-ScheduledTaskTrigger -Daily -At 9am), (New-ScheduledTaskTrigger -Daily -At 9pm))
+$settings = New-ScheduledTaskSettingsSet -StartWhenAvailable   # runs on boot if the PC was off
+Register-ScheduledTask -TaskName "JobRadar refresh" -Action $action -Trigger $triggers -Settings $settings
+```
+
+To open JobRadar when you sign in to Windows, add a shortcut to the Startup folder:
+
+```powershell
+$shortcut = (New-Object -ComObject WScript.Shell).CreateShortcut("$([Environment]::GetFolderPath('Startup'))\JobRadar.lnk")
+$shortcut.TargetPath = (Resolve-Path .venv\Scripts\pythonw.exe).Path
+$shortcut.Arguments = "-m jobradar"
+$shortcut.WorkingDirectory = (Get-Location).Path
+$shortcut.IconLocation = (Resolve-Path jobradar\static\icon.ico).Path
+$shortcut.Save()
+```
+
+On Windows, JobRadar also:
+
+- opens in a window of its own (Brave, Edge or Chrome in app mode), and if it's already running, only opens the window;
+- shows a notification with the best new jobs when a `refresh` finds any (clicking it opens JobRadar). The name and icon are registered for your user only, in `HKCU\Software\Classes\AppUserModelId\JobRadar`;
+- writes to `jobradar.log` when started without a console (`pythonw`).
+
+To undo: `Unregister-ScheduledTask -TaskName "JobRadar refresh"`, and delete `JobRadar.lnk` from `shell:startup`.
+
+## Tests
+
+```bash
+python -m pytest
+```
+
+The tests fake every API's answers, so they run without internet or keys.
+
+## Project structure
+
+```
+jobradar/
+  sources/          one connector per platform or job board
+  filters.py        area, level, kind of job, exclusions, scams, years of experience asked
+  scoring.py        keyword score + optional AI score (Gemini or Claude)
+  message.py        application message and interview notes
+  i18n.py           Português / English
+  refresh.py        runs every source, filters, scores and stores; one failing source doesn't stop the rest
+  discover.py       finds the careers sites of companies in your area
+  db.py             SQLite: jobs, status, notes, history
+  app.py            FastAPI
+  static/           the interface (Vue 3, no build step)
+config.example.yaml the starting configuration
+tests/              pytest
+```
+
+## Limitations
+
+- **LinkedIn, Indeed and Glassdoor are left out on purpose:** they block automated access and their terms forbid scraping. Use their own job alerts, and add the jobs you like with **+ Add job**.
+- The sources are Portuguese, so JobRadar is made for jobs in Portugal.
+- JobRadar only reads what each site allows in its `robots.txt` and never gets around bot protection. Some sites (for example IEFP) can't be read for that reason.
+- The Workday endpoint is the one its careers pages use, but it has no official documentation and may change.
+- If a source fails (network, an API change), the others carry on and the error shows at the top of the app.
+
+## License
+
+[MIT](LICENSE)
