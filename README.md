@@ -13,6 +13,7 @@ A local app that finds jobs in your area of Portugal across job boards and compa
   - **Company careers sites** on SmartRecruiters, Lever, Workday, SAP SuccessFactors and BambooHR (Bosch, Farfetch, Accenture, Deloitte, EY, Fujitsu… or any company you add)
 - **Filters** by your area, the kind of job (words the title must have), your level (junior words, senior words to skip), excluded words and companies, job age and typical scam signs. When a source doesn't say where the job is, it looks for the city in the description.
 - **Scores each job from 0 to 100** from keywords (level, area, your skills and interests), with a penalty for jobs that ask for 3+ years. With an AI key, an LLM also scores each new job against your profile and writes one sentence on why.
+- **Your profile from your CV** (👤): drop your CV (PDF) and the AI fills in your name, contacts, skills, education, projects, experience and the jobs you're after; check and fix anything before saving, or fill it in by hand. Everything lands in `config.yaml`, which the score, the messages and the interview prep use.
 - **Writes a draft application message** (✉) in the posting's language, using only the facts in your profile, and honest about what you're missing.
 - **Prepares you for the interview** (🎯): what the job is looking for, likely technical and behavioural questions with hints from your profile, your gaps against the posting, and questions to ask the company.
 - **Tracks your applications**: mark jobs as saved, applied (with the date) or discarded, and write notes. Jobs you find elsewhere (LinkedIn, a friend…) can be added by hand.
@@ -48,11 +49,11 @@ cp .env.example .env
 python -m jobradar
 ```
 
-The first run creates `config.yaml` from [`config.example.yaml`](config.example.yaml). That file is yours: git ignores it, so updating JobRadar never touches your settings. Set your area, the kind of job and your profile (next section), then press **Find jobs**. The first search takes about a minute, because JobRadar reads the full description of every job that passes the first filter.
+The first run creates `config.yaml` from [`config.example.yaml`](config.example.yaml). That file is yours: git ignores it, so updating JobRadar never touches your settings. The 👤 Profile screen opens by itself: drop your CV or fill it in, set your area and level, save, then press **Find jobs**. The first search takes about a minute, because JobRadar reads the full description of every job that passes the first filter.
 
 ## Set it up for you
 
-Everything is in `config.yaml`, which you can also edit with the ⚙ button in the app.
+The 👤 Profile screen covers what most people need: who you are, what you know, the kind of job (title words), the area and the level. It only rewrites the values you changed, so the comments and the rest of `config.yaml` stay as they were. Everything else, and the same settings in full, are in `config.yaml`, which you can also edit with the ⚙ button.
 
 | Setting | What it does |
 |---|---|
@@ -64,7 +65,7 @@ Everything is in `config.yaml`, which you can also edit with the ⚙ button in t
 | `search.junior_keywords` / `exclude_title_keywords` | Your level: words that mark a junior job (they add points), and title words to skip (senior, lead…) |
 | `search.exclude_keywords` / `exclude_companies` | Jobs and companies to ignore |
 | `search.max_age_days` | Skip jobs older than this |
-| `profile` | Your summary, skills and interests (for the score), plus your name, signature and the facts the AI may use in messages |
+| `profile` | Your summary, skills and interests (for the score), plus your name, signature, education, projects, experience and other facts the AI may use in messages (the 👤 screen fills these in) |
 | `sources` | Where to look (see below) |
 
 Your area is written only once: ITJobs, Workday and SuccessFactors take it from `search`, unless an entry sets its own (`locations` with ITJobs district ids, `search` on Workday, `location` on SuccessFactors).
@@ -157,6 +158,7 @@ jobradar/
   filters.py        area, level, kind of job, exclusions, scams, years of experience asked
   scoring.py        keyword score + optional AI score (Gemini or Claude)
   message.py        application message and interview notes
+  profile.py        the 👤 Profile screen: its fields, where they go in config.yaml, reading a CV with the AI
   i18n.py           Português / English
   refresh.py        runs every source, filters, scores and stores; one failing source doesn't stop the rest
   discover.py       finds the careers sites of companies in your area

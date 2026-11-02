@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -55,6 +56,10 @@ def validate(cfg: dict) -> list[str]:
                 errors.append(t("{field} tem de ser uma lista.", field=f"search.{key}"))
         if not search.get("locations"):
             errors.append(t("search.locations não pode estar vazio."))
+    profile = cfg.get("profile") if isinstance(cfg.get("profile"), dict) else {}
+    for key in ("skills", "focus", "education", "projects", "experience"):
+        if key in profile and not isinstance(profile[key], list):
+            errors.append(t("{field} tem de ser uma lista.", field=f"profile.{key}"))
     sources = cfg.get("sources")
     if not isinstance(sources, dict) or not sources:
         errors.append(t("Falta a secção '{section}'.", section="sources"))
@@ -105,6 +110,92 @@ def save_text(text: str, path: Path | str = DEFAULT_CONFIG) -> dict:
     Path(path).write_text(text, encoding="utf-8")
     i18n.use(cfg)
     return cfg
+
+
+def _scalar(text: str) -> str:
+    """Plain when YAML reads it back as the same text, quoted otherwise ("c#", "yes", "a: b"...)."""
+    try:
+        if text and yaml.safe_load(f"[{text}]") == [text]:
+            return text
+    except yaml.YAMLError:
+        pass
+    return json.dumps(text, ensure_ascii=False)  # a JSON string is also a YAML string
+
+
+def _render(key: str, value, indent: int, width: int = 110) -> str:
+    """`key: value` in config.yaml's own style: lists in [...] wrapped and aligned under the
+    first item, text with line breaks as a | block."""
+    pad = " " * indent
+    if isinstance(value, bool):
+        return f"{key}: {'true' if value else 'false'}"
+    if isinstance(value, list):
+        head = f"{key}: ["
+        lines, line = [], head
+        for i, item in enumerate(value):
+            word = _scalar(str(item)) + ("," if i < len(value) - 1 else "]")
+            if line != head and indent + len(line) + 1 + len(word) > width:
+                lines.append(line.rstrip())
+                line = " " * len(head) + word
+            else:
+                line += ("" if line == head else " ") + word
+        lines.append(line if value else f"{key}: []")
+        return f"\n{pad}".join(lines)
+    value = str(value).strip()
+    if "\n" in value:
+        return f"{key}: |\n" + "\n".join(f"{pad}  {line}".rstrip() for line in value.splitlines())
+    return f"{key}: {_scalar(value) if value else chr(34) * 2}"
+
+
+def _same(old, new) -> bool:
+    if isinstance(old, str) and isinstance(new, str):  # a | block reads back with a final line break
+        return old.strip() == new.strip()
+    return old == new or (old is None and new in ("", []))
+
+
+def update(changes: dict[tuple[str, str], object], path: Path | str = DEFAULT_CONFIG) -> dict:
+    """Change some values of config.yaml (the 👤 Profile screen) and leave every other character
+    as it was: comments, order, line breaks. PyYAML says where each value starts and ends."""
+    text = read_text(path)
+    current = yaml.safe_load(text) or {}
+    root = yaml.compose(text)
+    sections = {k.value: v for k, v in root.value} if isinstance(root, yaml.MappingNode) else {}
+    edits: list[tuple[int, int, str]] = []
+    for section in dict.fromkeys(s for s, _ in changes):
+        wanted = {k: v for (s, k), v in changes.items() if s == section
+                  and not _same((current.get(section) or {}).get(k), v)}
+        mapping = sections.get(section)
+        if wanted and section not in sections:  # e.g. no `profile:` yet: a new section at the end
+            lines = [f"  {_render(k, v, 2)}" for k, v in wanted.items() if v not in ("", [], None)]
+            sep = "" if text.endswith("\n") else "\n"
+            edits.append((len(text), len(text), f"{sep}{section}:\n" + "\n".join(lines) + "\n"))
+            continue
+        if not wanted or not isinstance(mapping, yaml.MappingNode) or mapping.flow_style or not mapping.value:
+            if wanted:
+                raise ConfigError(t("Não foi possível gravar: a secção '{section}' do config.yaml tem um formato "
+                                    "que a app não sabe editar. Edita-a no ⚙.", section=section))
+            continue
+        indent = mapping.value[0][0].start_mark.column
+        found = {k.value: (k, v) for k, v in mapping.value}
+        added = []
+        for key, value in wanted.items():
+            if key in found:
+                k, v = found[key]
+                end_nl = text[v.end_mark.index - 1] == "\n"  # a | block ends with its line break
+                new = _render(key, value, indent) + ("\n" if end_nl else "")
+                edits.append((k.start_mark.index, v.end_mark.index, new))
+            elif value not in ("", [], None):  # an empty field doesn't add a line
+                added.append(" " * indent + _render(key, value, indent))
+        if added:
+            end = mapping.value[-1][1].end_mark.index
+            at_line_start = text[end - 1] == "\n"
+            edits.append((end, end, ("" if at_line_start else "\n") + "\n".join(added) + ("\n" if at_line_start else "")))
+    for start, end, new in sorted(edits, reverse=True):
+        text = text[:start] + new + text[end:]
+    cfg = parse(text)
+    for (section, key), value in changes.items():  # what YAML reads back must be what was asked
+        if not _same((cfg.get(section) or {}).get(key), value):
+            raise ConfigError(t("Não foi possível gravar {field}: confirma o valor.", field=f"{section}.{key}"))
+    return save_text(text, path)
 
 
 def set_language(language: str, path: Path | str = DEFAULT_CONFIG) -> dict:

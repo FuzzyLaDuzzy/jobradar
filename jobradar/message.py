@@ -1,12 +1,14 @@
 """AI help for one job, from the profile and the posting: the short message sent with an
 application, and notes to prepare the interview.
 
-Runs only when asked (the buttons in "Descrição e notas"), so it uses the provider's
+Runs only when asked (the buttons under "Descrição"), so it uses the provider's
 better writing model (scoring.llm_settings: Gemini Flash, or Claude Opus). The message is
 written in the posting's language; the interview notes in the app's language.
 """
 
 from __future__ import annotations
+
+import base64
 
 from . import gemini, i18n
 from .i18n import t
@@ -54,13 +56,21 @@ class MessageError(RuntimeError):
     """The model declined or answered with no text."""
 
 
+def profile_text(profile: dict) -> str:
+    """The summary and every fact the AI may use: the free text plus the lists of the 👤 Profile screen."""
+    parts = [profile.get("cv_summary") or "", profile.get("facts") or ""]
+    for title, key in (("Formação", "education"), ("Projetos", "projects"), ("Experiência", "experience")):
+        if profile.get(key):
+            parts.append(f"{title}:\n" + "\n".join(f"- {item}" for item in profile[key]))
+    return "\n".join(p.strip() for p in parts if p.strip())
+
+
 def _prompt(job: dict, profile: dict, ask: str) -> str:
     posting = (job.get("description") or "(sem descrição)").replace("</anuncio>", "")
     return f"""<perfil>
 Nome: {profile.get("name", "")}
 Assinatura: {profile.get("signature", "")}
-{profile.get("cv_summary", "")}
-{profile.get("facts", "")}
+{profile_text(profile)}
 </perfil>
 
 <vaga>
@@ -78,23 +88,31 @@ Modelo de trabalho: {job.get("work_model") or "(não indicado)"}
 {ask}"""
 
 
-def _generate(system: str, prompt: str, cfg: dict, client=None) -> str:
+def _generate(system: str, prompt: str, cfg: dict, client=None, pdf: bytes | None = None,
+              light: bool = False) -> str:
+    """light: the provider's lighter model (the one that scores jobs), for simple reading tasks."""
     settings = llm_settings(cfg)
+    model = settings["model"] if light else settings["message_model"]
     if settings["provider"] == "gemini":
-        return gemini.generate(prompt, settings["message_model"], system=system, client=client)
+        return gemini.generate(prompt, model, system=system, client=client, pdf=pdf)
     if client is None:
         import anthropic
 
         client = anthropic.Anthropic()
+    content = prompt
+    if pdf:  # both providers read PDFs themselves: no PDF library needed here
+        content = [{"type": "document", "source": {"type": "base64", "media_type": "application/pdf",
+                                                    "data": base64.b64encode(pdf).decode()}},
+                   {"type": "text", "text": prompt}]
     response = client.beta.messages.create(
-        model=settings["message_model"],
+        model=model,
         max_tokens=16000,
         output_config={"effort": "medium"},  # the default on this model, set explicitly
         # a refusal by mistake is retried on another model inside the same call
         betas=["server-side-fallback-2026-07-01"],
         fallbacks="default",
         system=system,
-        messages=[{"role": "user", "content": prompt}],
+        messages=[{"role": "user", "content": content}],
     )
     if response.stop_reason == "refusal":
         raise MessageError(t("O modelo recusou este pedido."))

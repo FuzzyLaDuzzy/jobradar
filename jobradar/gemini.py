@@ -7,6 +7,7 @@ logs or error messages. Plain httpx, which the project already uses: no extra SD
 
 from __future__ import annotations
 
+import base64
 import os
 
 import httpx
@@ -23,6 +24,8 @@ class GeminiError(RuntimeError):
 def _fail(resp: httpx.Response) -> GeminiError:
     if resp.status_code == 429:
         return GeminiError(t("Atingiste o limite do plano gratuito do Gemini. Tenta daqui a uns minutos."))
+    if resp.status_code == 503:  # "The model is overloaded": it passes on its own
+        return GeminiError(t("O Gemini está com muita procura neste momento. Tenta daqui a uns minutos."))
     if resp.status_code in (401, 403):
         return GeminiError(t("A GEMINI_API_KEY foi recusada. Cria uma chave nova no Google AI Studio."))
     try:
@@ -33,9 +36,12 @@ def _fail(resp: httpx.Response) -> GeminiError:
 
 
 def generate(prompt: str, model: str, system: str = "", max_tokens: int = 8192,
-             client: httpx.Client | None = None, api_key: str | None = None) -> str:
+             client: httpx.Client | None = None, api_key: str | None = None, pdf: bytes | None = None) -> str:
+    parts: list[dict] = [{"text": prompt}]
+    if pdf:  # Gemini reads the PDF itself (a CV): sent inline, base64
+        parts.insert(0, {"inlineData": {"mimeType": "application/pdf", "data": base64.b64encode(pdf).decode()}})
     body: dict = {
-        "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+        "contents": [{"role": "user", "parts": parts}],
         # thinking counts against this limit, so leave plenty of room for the answer
         "generationConfig": {"maxOutputTokens": max_tokens},
     }

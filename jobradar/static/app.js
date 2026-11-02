@@ -86,7 +86,7 @@ const EN = {
   "Candidatei-me a {date}": "Applied on {date}",
   "Pede {n}+ anos": "Asks for {n}+ years",
   "Já não está publicada": "No longer published",
-  "Descrição e notas": "Description and notes",
+  "Descrição": "Description",
   "Sem descrição. Abre a vaga para ver os detalhes.": "No description. Open the job to see the details.",
   "Notas (ex.: enviei o CV a 30/10, contacto da recrutadora…)": "Notes (e.g. sent my CV on 30/10, the recruiter's contact…)",
   "A escrever…": "Writing…",
@@ -192,6 +192,46 @@ const EN = {
   "Em «API keys», carrega em «Create Key» e copia a chave.": "Under “API keys”, press “Create Key” and copy the key.",
   "Cola-a aqui e, no ⚙, muda scoring.llm.provider para anthropic.":
     "Paste it here and, with ⚙, change scoring.llm.provider to anthropic.",
+  // 👤 profile
+  "Perfil": "Profile",
+  "O teu perfil": "Your profile",
+  "É o que a pontuação, a mensagem de candidatura e a preparação da entrevista usam.":
+    "It's what the score, the application message and the interview prep use.",
+  "A ler o CV…": "Reading the CV…",
+  "Arrasta o teu CV (PDF) para aqui ou clica para o escolher": "Drag your CV (PDF) here or click to choose it",
+  "O {ai} lê o CV e preenche os campos em baixo: revê-os antes de guardar. O CV é enviado ao {ai} e não fica guardado.":
+    "{ai} reads the CV and fills in the fields below: check them before saving. The CV is sent to {ai} and isn't kept.",
+  "Para ler o CV é precisa uma chave de IA (🔑 nas definições). Também podes preencher à mão.":
+    "Reading the CV needs an AI key (🔑 in the settings). You can also fill it in by hand.",
+  "Quem és": "Who you are",
+  "Nome": "Name",
+  "Contactos (para a assinatura das mensagens)": "Contacts (for the messages' signature)",
+  "telefone · linkedin.com/in/… · github.com/…": "phone · linkedin.com/in/… · github.com/…",
+  "O que sabes": "What you know",
+  "Competências": "Skills",
+  "Temas que te interessam (valem mais pontos)": "Topics you care about (worth more points)",
+  "Formação": "Education",
+  "Projetos": "Projects",
+  "Experiência": "Experience",
+  "+ acrescentar": "+ add",
+  "Remover": "Remove",
+  "Escreve e carrega em Enter": "Type and press Enter",
+  "Resumo (o que a IA lê para pontuar as vagas)": "Summary (what the AI reads to score jobs)",
+  "Mais factos (texto livre)": "More facts (free text)",
+  "O que procuras": "What you're looking for",
+  "Posições (palavras que o título da vaga tem de ter)": "Positions (words the job title must have)",
+  "Zona (a primeira é a principal)": "Area (the first one is the main one)",
+  "aceitar também vagas 100% remotas": "also accept fully remote jobs",
+  "Nível": "Level",
+  "Só estágio e júnior": "Internships and junior only",
+  "Qualquer nível": "Any level",
+  "Guardar perfil": "Save profile",
+  "Perfil guardado. As pontuações novas aparecem na próxima procura.": "Profile saved. The new scores show up on the next search.",
+  "CV lido: revê os campos e carrega em Guardar perfil.": "CV read: check the fields and press Save profile.",
+  "Não foi possível ler o CV: {error}": "Couldn't read the CV: {error}",
+  "Não foi possível guardar o perfil: {error}": "Couldn't save the profile: {error}",
+  "Não foi possível abrir o perfil: {error}": "Couldn't open the profile: {error}",
+  "O CV tem mais de 5 MB.": "The CV is larger than 5 MB.",
   // score reasons, stored in Portuguese by jobradar/scoring.py
   "júnior/estágio": "junior/internship",
   "estágio profissional": "professional internship",
@@ -205,6 +245,49 @@ function loadFilters() {
     return {};
   }
 }
+
+const PROFILE_SEEN_KEY = "jobradar.profileSeen";
+const MAX_CV_BYTES = 5 * 1024 * 1024;
+const ITEM_LISTS = ["education", "projects", "experience"];
+
+function fileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).split(",")[1]); // drop "data:application/pdf;base64,"
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+// A list of short words as removable tags: Enter, a comma or leaving the field adds what was typed.
+const ChipList = {
+  props: { modelValue: Array, placeholder: String, label: String, removeLabel: String },
+  emits: ["update:modelValue"],
+  data: () => ({ draft: "" }),
+  methods: {
+    add() {
+      const items = this.draft.split(",").map((s) => s.trim()).filter(Boolean);
+      if (items.length) this.$emit("update:modelValue", [...new Set([...this.modelValue, ...items])]);
+      this.draft = "";
+    },
+    remove(i) {
+      this.$emit("update:modelValue", this.modelValue.filter((_, j) => j !== i));
+    },
+    key(e) {
+      if (e.key === "Enter" || e.key === ",") {
+        e.preventDefault();
+        this.add();
+      } else if (e.key === "Backspace" && !this.draft && this.modelValue.length) {
+        this.remove(this.modelValue.length - 1);
+      }
+    },
+  },
+  template: `<div class="chips">
+    <span v-for="(item, i) in modelValue" :key="item" class="chip">{{ item }}<button type="button"
+      @click="remove(i)" :aria-label="removeLabel + ' ' + item">✕</button></span>
+    <input v-model="draft" @keydown="key" @blur="add" :placeholder="placeholder" :aria-label="label">
+  </div>`,
+};
 
 createApp({
   data() {
@@ -240,6 +323,14 @@ createApp({
       newKeys: EMPTY_KEYS(),
       keysError: "",
       savingKeys: false,
+      profileOpen: false,
+      profile: null,
+      profileExample: false,
+      profileAi: "",
+      profileError: "",
+      savingProfile: false,
+      readingCv: false,
+      cvOver: false,
       toast: "",
     };
   },
@@ -476,6 +567,90 @@ createApp({
         /* storage unavailable: show it while no key is set */
       }
       if (!welcomed && !Object.values(this.keyStatus).some(Boolean)) this.openKeys(true);
+      else this.offerProfile();
+    },
+
+    // While the profile is still the example one, it opens by itself once per browser.
+    async offerProfile() {
+      try {
+        if (localStorage.getItem(PROFILE_SEEN_KEY) === "1") return;
+      } catch {
+        /* storage unavailable: offer it */
+      }
+      const data = await this.api("/api/profile").catch(() => null);
+      if (data && data.example) this.openProfile(data);
+    },
+
+    async openProfile(data = null) {
+      this.profileError = "";
+      try {
+        data = data || (await this.api("/api/profile"));
+      } catch (e) {
+        this.showToast(this.t("Não foi possível abrir o perfil: {error}", { error: e.message }));
+        return;
+      }
+      this.profile = data.profile;
+      this.profileExample = data.example;
+      this.profileAi = data.ai;
+      this.profileOpen = true;
+    },
+
+    closeProfile() {
+      this.profileOpen = false;
+      try {
+        localStorage.setItem(PROFILE_SEEN_KEY, "1");
+      } catch {
+        /* it will open by itself again next time */
+      }
+    },
+
+    async readCv(file) {
+      this.cvOver = false;
+      if (!file) return;
+      this.profileError = "";
+      if (file.size > MAX_CV_BYTES) {
+        this.profileError = this.t("O CV tem mais de 5 MB.");
+        return;
+      }
+      this.readingCv = true;
+      try {
+        const { profile } = await this.api("/api/profile/cv", {
+          method: "POST",
+          body: JSON.stringify({ pdf: await fileAsBase64(file) }),
+        });
+        // what the CV says replaces the fields; what it doesn't say (zone, level...) stays
+        for (const [key, value] of Object.entries(profile)) {
+          if (value && value.length) this.profile[key] = value;
+        }
+        if (this.profileExample) this.profile.facts = ""; // the example's placeholder facts
+        this.showToast(this.t("CV lido: revê os campos e carrega em Guardar perfil."));
+      } catch (e) {
+        this.profileError = this.t("Não foi possível ler o CV: {error}", { error: e.message });
+      } finally {
+        this.readingCv = false;
+      }
+    },
+
+    addItem(list) {
+      this.profile[list].push("");
+      this.$nextTick(() => this.$refs[list + "Item"]?.at(-1)?.focus());
+    },
+
+    async saveProfile() {
+      this.savingProfile = true;
+      this.profileError = "";
+      const body = { ...this.profile };
+      for (const list of ITEM_LISTS) body[list] = body[list].map((s) => s.trim()).filter(Boolean);
+      try {
+        const data = await this.api("/api/profile", { method: "PUT", body: JSON.stringify(body) });
+        this.profileExample = data.example;
+        this.closeProfile();
+        this.showToast(this.t("Perfil guardado. As pontuações novas aparecem na próxima procura."));
+      } catch (e) {
+        this.profileError = this.t("Não foi possível guardar o perfil: {error}", { error: e.message });
+      } finally {
+        this.savingProfile = false;
+      }
     },
 
     openKeys(firstRun = false) {
@@ -493,6 +668,7 @@ createApp({
       } catch {
         /* the welcome screen will show again next time */
       }
+      if (this.firstRun) this.offerProfile(); // first run: keys, then the profile
     },
 
     async saveKeys() {
@@ -601,4 +777,6 @@ createApp({
     this.load();
     this.checkWelcome();
   },
-}).mount("#app");
+})
+  .component("chip-list", ChipList)
+  .mount("#app");

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import hashlib
 import os
 import re
@@ -16,7 +17,7 @@ from pydantic import BaseModel, Field, field_validator
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from . import config as config_mod
-from . import gemini, i18n, message, scoring
+from . import gemini, i18n, message, profile, scoring
 from .i18n import t
 from .db import STATUSES, Database
 from .models import Job
@@ -81,6 +82,39 @@ class KeysBody(BaseModel):
         return value
 
 
+MAX_CV_BYTES = 5 * 1024 * 1024
+SHORT, LONG = 300, 5000
+
+
+class ProfileBody(BaseModel):
+    """The 👤 Profile screen (see profile.py for where each field goes in config.yaml)."""
+
+    name: str = Field("", max_length=SHORT)
+    signature: str = Field("", max_length=SHORT)
+    summary: str = Field("", max_length=LONG)
+    facts: str = Field("", max_length=LONG)
+    skills: list[str] = Field(default_factory=list, max_length=200)
+    focus: list[str] = Field(default_factory=list, max_length=200)
+    education: list[str] = Field(default_factory=list, max_length=50)
+    projects: list[str] = Field(default_factory=list, max_length=50)
+    experience: list[str] = Field(default_factory=list, max_length=50)
+    positions: list[str] = Field(default_factory=list, max_length=200)
+    locations: list[str] = Field(default_factory=list, max_length=50)  # empty: config.validate says so
+    allow_remote: bool = False
+    junior_only: bool = True
+
+    @field_validator("skills", "focus", "education", "projects", "experience", "positions", "locations")
+    @classmethod
+    def _short_items(cls, items: list[str]) -> list[str]:
+        if any(len(item) > SHORT for item in items):
+            raise ValueError(t("cada item pode ter até {n} caracteres", n=SHORT))
+        return items
+
+
+class CvBody(BaseModel):
+    pdf: str = Field(max_length=MAX_CV_BYTES * 4 // 3 + 4)  # base64 of a PDF of up to 5 MB
+
+
 def key_status() -> dict[str, bool]:
     """Which keys are set: never their values."""
     return {key: bool(os.environ.get(key)) for key in config_mod.KEYS}
@@ -127,11 +161,8 @@ def create_app(
         new = db.upsert(job, kw, reasons, {}, datetime.now(timezone.utc).isoformat(timespec="seconds"))
         return db.update(job.uid, status="guardada" if new else None, notes=body.notes or None)
 
-    def ai_text(uid: str, generate) -> dict:
-        """Runs one of the AI helpers (message.write or message.interview) for a job."""
-        job = db.get(uid)
-        if job is None:
-            raise HTTPException(404, t("Vaga não encontrada"))
+    def with_ai(call):
+        """Runs an AI helper with the config, once the config is valid and the provider's key is set."""
         try:
             cfg = config_mod.load(config_path)
         except config_mod.ConfigError as exc:
@@ -143,7 +174,7 @@ def create_app(
         import anthropic
 
         try:
-            return {"text": generate(job, cfg, llm_client)}
+            return call(cfg)
         except (message.MessageError, gemini.GeminiError) as exc:
             raise HTTPException(502, str(exc)) from exc
         except anthropic.AuthenticationError as exc:
@@ -154,6 +185,47 @@ def create_app(
             raise HTTPException(502, t("A API da Anthropic respondeu com o erro {code}.", code=exc.status_code)) from exc
         except anthropic.APIConnectionError as exc:
             raise HTTPException(502, t("Sem ligação à API da Anthropic.")) from exc
+
+    def ai_text(uid: str, generate) -> dict:
+        """Runs one of the AI helpers (message.write or message.interview) for a job."""
+        job = db.get(uid)
+        if job is None:
+            raise HTTPException(404, t("Vaga não encontrada"))
+        return {"text": with_ai(lambda cfg: generate(job, cfg, llm_client))}
+
+    @app.get("/api/profile")
+    def get_profile():
+        try:
+            cfg = config_mod.load(config_path)
+        except config_mod.ConfigError as exc:
+            raise HTTPException(400, t("Configuração inválida: {error}", error=exc)) from exc
+        settings = scoring.llm_settings(cfg)
+        # who reads the CV, shown on the screen before it is sent; "" = no AI key, fill it in by hand
+        ai = {"gemini": "Gemini (Google)", "anthropic": "Claude (Anthropic)"}[settings["provider"]]
+        return {"profile": profile.from_config(cfg), "example": profile.is_example(cfg),
+                "ai": ai if os.environ.get(settings["key_env"]) else ""}
+
+    @app.put("/api/profile")
+    def put_profile(body: ProfileBody):
+        try:
+            cfg = config_mod.load(config_path)
+            config_mod.update(profile.changes(profile.clean(body.model_dump()), cfg), config_path)
+        except config_mod.ConfigError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        return get_profile()
+
+    @app.post("/api/profile/cv")
+    def read_cv(body: CvBody):
+        try:
+            pdf = base64.b64decode(body.pdf, validate=True)
+        except ValueError as exc:
+            raise HTTPException(400, t("O ficheiro não é um PDF.")) from exc
+        if not pdf.startswith(b"%PDF"):
+            raise HTTPException(400, t("O ficheiro não é um PDF."))
+        if len(pdf) > MAX_CV_BYTES:
+            raise HTTPException(413, t("O CV tem mais de 5 MB."))
+        # read only: the screen shows what the AI found and the person decides what to save
+        return {"profile": with_ai(lambda cfg: profile.read_cv(pdf, cfg, llm_client))}
 
     @app.post("/api/jobs/{uid:path}/message")
     def job_message(uid: str):

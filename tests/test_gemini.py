@@ -36,6 +36,7 @@ def test_generate_request_and_answer():
     (httpx.Response(200, json={"promptFeedback": {"blockReason": "SAFETY"}}), "bloqueou"),
     (httpx.Response(429, json={"error": {"code": 429, "message": "Resource exhausted"}}), "limite"),
     (httpx.Response(403, json={"error": {"code": 403, "message": "API key not valid"}}), "recusada"),
+    (httpx.Response(503, json={"error": {"code": 503, "message": "high demand"}}), "muita procura"),
 ])
 def test_generate_errors(response, expected):
     with pytest.raises(gemini.GeminiError, match=expected) as err:

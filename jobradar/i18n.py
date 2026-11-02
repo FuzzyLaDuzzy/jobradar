@@ -23,6 +23,16 @@ EN = {
     "{entry} precisa de '{field}'.": "{entry} needs '{field}'.",
     "scoring.llm.provider tem de ser {options}.": "scoring.llm.provider must be {options}.",
     "language tem de ser {options}.": "language must be {options}.",
+    "Não foi possível gravar: a secção '{section}' do config.yaml tem um formato que a app não sabe editar. "
+    "Edita-a no ⚙.":
+        "Couldn't save: the '{section}' section of config.yaml has a layout the app can't edit. Edit it with ⚙.",
+    "Não foi possível gravar {field}: confirma o valor.": "Couldn't save {field}: check the value.",
+    # profile.py and its endpoints
+    "A IA não conseguiu ler o CV. Tenta outra vez ou preenche à mão.":
+        "The AI couldn't read the CV. Try again or fill it in by hand.",
+    "O ficheiro não é um PDF.": "The file isn't a PDF.",
+    "O CV tem mais de 5 MB.": "The CV is larger than 5 MB.",
+    "cada item pode ter até {n} caracteres": "each item can have up to {n} characters",
     # app.py
     "o link tem de começar por http:// ou https://": "the link must start with http:// or https://",
     "Vaga não encontrada": "Job not found",
@@ -41,6 +51,8 @@ EN = {
     # gemini.py, message.py
     "Atingiste o limite do plano gratuito do Gemini. Tenta daqui a uns minutos.":
         "You've reached the Gemini free tier limit. Try again in a few minutes.",
+    "O Gemini está com muita procura neste momento. Tenta daqui a uns minutos.":
+        "Gemini is very busy right now. Try again in a few minutes.",
     "A GEMINI_API_KEY foi recusada. Cria uma chave nova no Google AI Studio.":
         "GEMINI_API_KEY was refused. Create a new key in Google AI Studio.",
     "A API do Gemini respondeu com o erro {code}. {detail}": "The Gemini API answered with error {code}. {detail}",
