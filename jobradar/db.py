@@ -10,6 +10,12 @@ from .models import Job
 
 STATUSES = ("nova", "guardada", "candidatei", "descartada")
 
+
+def web_link(url: str | None) -> str:
+    """Only http(s) links reach the page: a javascript: link from a feed would run when clicked."""
+    url = (url or "").strip()
+    return url if url.lower().startswith(("http://", "https://")) else ""
+
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS jobs (
     uid TEXT PRIMARY KEY,
@@ -78,13 +84,13 @@ class Database:
                 company=job.company,
                 title=job.title,
                 location=job.location,
-                url=job.url,
+                url=web_link(job.url),
                 posted_at=job.posted_at,
                 description=job.description,
                 contract=job.contract,
                 experience=job.experience,
                 work_model=job.work_model,
-                logo=job.logo,
+                logo=web_link(job.logo),
                 kw_score=kw_score,
                 reasons=json.dumps(reasons, ensure_ascii=False),
                 flags=json.dumps(flags),

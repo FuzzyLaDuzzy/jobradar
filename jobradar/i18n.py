@@ -36,6 +36,7 @@ EN = {
     "Sem ligação à API da Anthropic.": "No connection to the Anthropic API.",
     "Estado inválido. Usa: {options}": "Invalid status. Use: {options}",
     "Já há uma atualização a correr.": "A refresh is already running.",
+    "Pedido recusado: vem de outro site.": "Request refused: it comes from another site.",
     "a chave só pode ter letras, números, '-', '_' e '.'": "a key can only have letters, numbers, '-', '_' and '.'",
     # gemini.py, message.py
     "Atingiste o limite do plano gratuito do Gemini. Tenta daqui a uns minutos.":

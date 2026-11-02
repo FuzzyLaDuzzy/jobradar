@@ -62,3 +62,28 @@ def test_other_sites_cant_set_the_keys(client):
     resp = client.options("/api/keys", headers={"Origin": "https://evil.example",
                                                 "Access-Control-Request-Method": "PUT"})
     assert resp.status_code >= 400 and "access-control-allow-origin" not in resp.headers
+    # and requests that change something are refused when they come from another site
+    for method, path in [("PUT", "/api/keys"), ("POST", "/api/refresh"), ("POST", "/api/jobs/x/message")]:
+        resp = client.request(method, path, json={}, headers={"Origin": "https://evil.example"})
+        assert resp.status_code == 403, path
+    assert client.put("/api/keys", json={}, headers={"Origin": "http://testserver"}).status_code == 200
+
+
+def test_other_host_names_are_refused(client):
+    # DNS rebinding: evil.example pointed at 127.0.0.1 arrives with its own name as the Host
+    assert client.get("/api/keys", headers={"Host": "evil.example:8000"}).status_code == 400
+    assert client.get("/api/keys", headers={"Host": "127.0.0.1:8000"}).status_code == 200
+
+
+def test_only_web_links_are_stored(tmp_path):
+    from jobradar.db import Database
+    from jobradar.models import Job
+
+    db = Database(tmp_path / "t.db")
+    db.upsert(Job(source="s", external_id="1", company="X", title="Dev", location="Lisboa",
+                  url="javascript:alert(1)", logo="data:image/svg+xml,<svg onload=x>"), 0, [], {}, "2026-11-02")
+    db.upsert(Job(source="s", external_id="2", company="X", title="Dev", location="Lisboa",
+                  url=" https://example.com/job ", logo="https://example.com/logo.png"), 0, [], {}, "2026-11-02")
+    jobs = {j["external_id"]: j for j in db.all_jobs()}
+    assert (jobs["1"]["url"], jobs["1"]["logo"]) == ("", "")
+    assert (jobs["2"]["url"], jobs["2"]["logo"]) == ("https://example.com/job", "https://example.com/logo.png")

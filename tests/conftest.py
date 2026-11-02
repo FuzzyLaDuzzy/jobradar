@@ -19,6 +19,14 @@ def portuguese():
     i18n.language = "pt"
 
 
+@pytest.fixture(autouse=True)
+def test_host(monkeypatch):
+    """FastAPI's TestClient calls itself "testserver": let it through like 127.0.0.1."""
+    from jobradar import app
+
+    monkeypatch.setattr(app, "ALLOWED_HOSTS", [*app.ALLOWED_HOSTS, "testserver"])
+
+
 @pytest.fixture
 def cfg():
     return yaml.safe_load((ROOT / "config.example.yaml").read_text(encoding="utf-8"))

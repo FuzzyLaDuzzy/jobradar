@@ -109,9 +109,9 @@ def main() -> None:
 
     import uvicorn
 
-    from .app import create_app
+    from .app import ALLOWED_HOSTS, create_app
 
-    app = create_app(config_path=args.config, db_path=args.db)
+    app = create_app(config_path=args.config, db_path=args.db, allowed_hosts=[*ALLOWED_HOSTS, args.host])
     if not args.no_browser:
         threading.Timer(1.2, lambda: open_window(url)).start()
     print(t("JobRadar a correr em {url}  (Ctrl+C para parar)", url=url))

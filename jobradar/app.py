@@ -7,11 +7,13 @@ import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from urllib.parse import urlsplit
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from . import config as config_mod
 from . import gemini, i18n, message, scoring
@@ -21,6 +23,9 @@ from .models import Job
 from .refresh import run_refresh
 
 STATIC = Path(__file__).parent / "static"
+# The names JobRadar answers to. A site whose domain is pointed at 127.0.0.1 (DNS rebinding)
+# arrives with its own name in the Host header and is turned away.
+ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
 
 
 class JobUpdate(BaseModel):
@@ -87,8 +92,20 @@ def create_app(
     refresh_kwargs: dict | None = None,
     llm_client=None,
     env_path: Path | str = ".env",
+    allowed_hosts: list[str] | None = None,
 ) -> FastAPI:
     app = FastAPI(title="JobRadar")
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts or ALLOWED_HOSTS)
+
+    @app.middleware("http")
+    async def same_site_only(request: Request, call_next):
+        # Browsers send Origin with every request from another site that changes something:
+        # such a page must not start a search, spend the AI quota or change the keys.
+        origin = request.headers.get("origin")
+        if request.method not in ("GET", "HEAD") and origin and urlsplit(origin).netloc != request.headers.get("host"):
+            return JSONResponse({"detail": t("Pedido recusado: vem de outro site.")}, status_code=403)
+        return await call_next(request)
+
     db = Database(db_path)
     refresh_lock = threading.Lock()
     refresh_kwargs = refresh_kwargs or {}
@@ -179,8 +196,8 @@ def create_app(
     def get_keys():
         return key_status()
 
-    # PUT, not POST: a page on another site can't send a PUT to 127.0.0.1 without a CORS
-    # preflight, which this app never answers, so only JobRadar's own page can set the keys.
+    # Only JobRadar's own page can set the keys: other sites are stopped by same_site_only
+    # and TrustedHostMiddleware, and a PUT from them also needs a CORS preflight this app never allows.
     @app.put("/api/keys")
     def put_keys(body: KeysBody):
         config_mod.save_keys({k: v for k, v in body.model_dump().items() if v}, env_path)
