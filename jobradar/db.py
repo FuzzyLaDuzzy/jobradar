@@ -1,14 +1,63 @@
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 import threading
 from datetime import date, datetime, timezone
 from pathlib import Path
 
 from .models import Job
+from .text import company_key, normalize
 
 STATUSES = ("nova", "guardada", "candidatei", "descartada")
+
+
+# job boards and agencies that repost companies' jobs: the company's own posting is the one kept
+AGGREGATORS = {"itjobs", "landingjobs", "netempregos", "randstad", "sysmatch"}
+
+
+_GENDER_RE = re.compile(r"\((?:[mfhxd]\s*/\s*)+[a-z]+\.?\)")  # (m/f), (f/m/x), (f/m/div.), (h/m)
+
+
+def duplicate_key(job: dict) -> str | None:
+    """Same company and same title = the same job on two sites (often the company's page and ITJobs).
+    The title is compared without "(m/f)", "Ref ...", punctuation, or the job's own place at the end;
+    other brackets count, so "Developer (Java)" and "Developer (Python)" stay two jobs."""
+    company = company_key(job.get("company"))
+    title = _GENDER_RE.sub(" ", re.sub(r"\bref\b.*$", " ", normalize(job.get("title"))))
+    words = re.findall(r"[a-z0-9+#]+", title)
+    place = set(re.findall(r"[a-z0-9]+", normalize(job.get("location"))))
+    while words and words[-1] in place:  # "Cybersecurity Specialist - Braga" in Braga
+        words.pop()
+    return f"{company}|{' '.join(words)}" if company and words else None
+
+
+def merge_duplicates(jobs: list[dict]) -> list[dict]:
+    """One card per job: the copy you acted on (status or notes), else an active one, else the company's
+    own posting, else the best score. The copies from other sites go in `also_on` (source and link).
+    Only other sites: two "Data Analyst" postings from the same source are two jobs (two teams)."""
+    groups: dict[str, list[dict]] = {}
+    for job in jobs:
+        key = duplicate_key(job)
+        if key:
+            groups.setdefault(key, []).append(job)
+
+    def rank(job: dict):
+        return (job["status"] != "nova" or bool(job.get("notes")), job["active"],
+                job["source"].split(":")[0] not in AGGREGATORS, job.get("score") or 0)
+
+    primary = {key: max(group, key=rank) for key, group in groups.items()}
+    merged = []
+    for job in jobs:
+        key = duplicate_key(job)
+        card = primary.get(key)
+        if card is not None and card is not job and card["source"] != job["source"]:
+            continue  # a copy on another site: a link on the card
+        others = groups.get(key, []) if card is job else []
+        job["also_on"] = [{"source": j["source"], "url": j["url"]} for j in others if j["source"] != job["source"]]
+        merged.append(job)
+    return merged
 
 
 def web_link(url: str | None) -> str:
@@ -158,7 +207,7 @@ class Database:
             "SELECT * FROM jobs WHERE first_seen >= ? AND matches = 1 AND active = 1 ORDER BY score DESC",
             (since,),
         ).fetchall()
-        return [_row_to_dict(r) for r in rows]
+        return merge_duplicates([_row_to_dict(r) for r in rows])
 
     def unscored(self, limit: int) -> list[sqlite3.Row]:
         return self.conn.execute(
@@ -204,13 +253,23 @@ class Database:
         row = self.conn.execute("SELECT * FROM jobs WHERE uid = ?", (uid,)).fetchone()
         return _row_to_dict(row) if row else None
 
-    def all_jobs(self) -> list[dict]:
+    def _listed(self) -> list[dict]:
         """Jobs that pass the current filters, plus any you saved or applied to."""
         rows = self.conn.execute(
             "SELECT * FROM jobs WHERE matches = 1 OR status IN ('guardada', 'candidatei') "
             "ORDER BY score DESC, posted_at DESC"
         ).fetchall()
         return [_row_to_dict(r) for r in rows]
+
+    def all_jobs(self) -> list[dict]:
+        return merge_duplicates(self._listed())
+
+    def copies(self, uid: str) -> list[str]:
+        """The other copies of a job on other sites (see duplicate_key), so a status or note reaches all."""
+        job = self.get(uid)
+        key = duplicate_key(job) if job else None
+        return [j["uid"] for j in self._listed()
+                if key and j["source"] != job["source"] and duplicate_key(j) == key]
 
     # --- runs -------------------------------------------------------------
     def add_run(self, **run) -> None:

@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field, field_validator
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from . import config as config_mod
-from . import gemini, i18n, message, profile, scoring
+from . import gemini, i18n, message, profile, scoring, skills
 from .i18n import t
 from .db import STATUSES, Database
 from .models import Job
@@ -193,6 +193,14 @@ def create_app(
             raise HTTPException(404, t("Vaga não encontrada"))
         return {"text": with_ai(lambda cfg: generate(job, cfg, llm_client))}
 
+    @app.get("/api/market")
+    def get_market():
+        try:
+            cfg = config_mod.load(config_path)  # the profile says which skills you have
+        except config_mod.ConfigError as exc:
+            raise HTTPException(400, t("Configuração inválida: {error}", error=exc)) from exc
+        return skills.market(db.all_jobs(), cfg.get("profile") or {})
+
     @app.get("/api/profile")
     def get_profile():
         try:
@@ -242,6 +250,8 @@ def create_app(
         job = db.update(uid, status=body.status, notes=body.notes)
         if job is None:
             raise HTTPException(404, t("Vaga não encontrada"))
+        for copy in db.copies(uid):  # the same job on another site shows as one card: keep them in step
+            db.update(copy, status=body.status, notes=body.notes)
         return job
 
     @app.post("/api/refresh")

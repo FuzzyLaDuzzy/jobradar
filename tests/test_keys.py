@@ -82,7 +82,7 @@ def test_only_web_links_are_stored(tmp_path):
     db = Database(tmp_path / "t.db")
     db.upsert(Job(source="s", external_id="1", company="X", title="Dev", location="Lisboa",
                   url="javascript:alert(1)", logo="data:image/svg+xml,<svg onload=x>"), 0, [], {}, "2026-11-02")
-    db.upsert(Job(source="s", external_id="2", company="X", title="Dev", location="Lisboa",
+    db.upsert(Job(source="s", external_id="2", company="X", title="Data Engineer", location="Lisboa",
                   url=" https://example.com/job ", logo="https://example.com/logo.png"), 0, [], {}, "2026-11-02")
     jobs = {j["external_id"]: j for j in db.all_jobs()}
     assert (jobs["1"]["url"], jobs["1"]["logo"]) == ("", "")

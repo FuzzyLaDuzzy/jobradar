@@ -165,6 +165,8 @@ body {
 .badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
 .badge { font-size: 12px; padding: 2px 9px; border-radius: 999px; background: var(--surface-2); color: var(--muted); }
 .badge.source { background: transparent; border: 1px solid var(--border); }
+a.badge.source { color: var(--muted); text-decoration: none; }
+a.badge.source:hover { color: var(--accent); border-color: var(--accent); }
 .badge.new { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
 .badge.warn { background: var(--warn-bg); color: var(--warn); }
 .badge.applied { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
@@ -215,6 +217,16 @@ details textarea {
   border: 1px solid var(--border); border-radius: 10px; padding: 8px 11px;
 }
 .form textarea { min-height: 80px; resize: vertical; }
+/* 📊 market */
+.sheet.market { width: min(640px, 100%); }
+.bars { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.bars li { display: grid; grid-template-columns: minmax(110px, 30%) 1fr auto auto; gap: 10px; align-items: center; font-size: 13.5px; }
+.bar { height: 10px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.bar span { display: block; height: 100%; border-radius: 999px; background: var(--mid); }
+.bar span.have { background: var(--high); }
+.bar-count { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+@media (max-width: 720px) { .bars li { grid-template-columns: 1fr auto; } .bar { grid-column: 1 / -1; order: 3; } }
+
 /* 👤 profile */
 .sheet.profile { width: min(640px, 100%); }
 .sheet.profile h3 { margin: 8px 0 0; font-size: 15px; }

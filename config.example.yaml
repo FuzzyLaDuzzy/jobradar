@@ -32,7 +32,7 @@ search:
   # name when there is one (e.g. [lisboa, lisbon]).
   locations_primary: [braga]
   # Every accepted place. Include your district (e.g. lisboa, porto) so ITJobs finds it.
-  locations: [braga, guimaraes, famalicao, vila nova de famalicao, barcelos, vila verde]
+  locations: [braga, guimaraes, famalicao, vila nova de famalicao, lousado, barcelos, vila verde]
   allow_remote: false         # true = also accept 100% remote jobs in Portugal
 
   # Kind of job: the title must contain at least one of these words. Empty list = any job.
@@ -100,6 +100,9 @@ sources:
     - company: BoschGroup
       country: pt
       logo: https://www.google.com/s2/favicons?domain=bosch.com&sz=128
+    - company: continental    # jobs in Lousado (Famalicão)
+      country: pt
+      logo: https://www.google.com/s2/favicons?domain=continental.com&sz=128
   lever:                      # https://jobs.lever.co/<site>
     - site: farfetch
       company: FARFETCH
@@ -108,6 +111,13 @@ sources:
     - name: Accenture
       url: https://accenture.wd103.myworkdayjobs.com/AccentureCareers
       logo: https://www.google.com/s2/favicons?domain=accenture.com&sz=128
+    - name: Aptiv
+      url: https://aptiv.wd5.myworkdayjobs.com/APTIV_CAREERS
+      logo: https://www.google.com/s2/favicons?domain=aptiv.com&sz=128
+  bamboohr:                   # https://<site>.bamboohr.com/careers
+    - name: Uphold
+      site: uphold
+      logo: https://www.google.com/s2/favicons?domain=uphold.com&sz=128
   successfactors:             # SAP SuccessFactors careers sites (jobs.<company>...)
     - name: Deloitte
       url: https://jobs.deloitte.pt

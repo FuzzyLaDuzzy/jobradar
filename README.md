@@ -1,8 +1,42 @@
 # JobRadar
 
+[![tests](https://github.com/FuzzyLaDuzzy/jobradar/actions/workflows/tests.yml/badge.svg)](https://github.com/FuzzyLaDuzzy/jobradar/actions/workflows/tests.yml)
+
 A local app that finds jobs in your area of Portugal across job boards and company careers sites, keeps the ones that match the kind of job and level you want, scores each one against your profile, and helps you track your applications. It runs on your own computer, in Portuguese or English.
 
 ![JobRadar](docs/screenshot.png)
+
+## Where it looks
+
+Out of the box ([`config.example.yaml`](config.example.yaml)) it reads these job boards and companies. Each one has been checked against its real site; add any other company on the same platforms in a few lines (see [Find the companies in your area](#find-the-companies-in-your-area)).
+
+| Job boards | Covers | How |
+|---|---|---|
+| **ITJobs.pt** | All of Portugal, IT | Official API (free key) |
+| **Landing.jobs** | All of Portugal, tech | Official feed |
+| **Net-Empregos** | All of Portugal (IT categories) | Official RSS feed |
+| **Randstad** (incl. Randstad Digital) | All of Portugal | Official RSS feed |
+| **Sysmatch** | All of Portugal, IT | Its jobs page |
+
+| Company | Where its jobs have been | Platform |
+|---|---|---|
+| **Bosch** | Braga, Aveiro, Ovar, Lisbon | SmartRecruiters |
+| **Continental** | Lousado (Famalicão) | SmartRecruiters |
+| **Farfetch** | Porto, Lisbon, Braga, Guimarães | Lever |
+| **Accenture** | Lisbon, Porto, Braga and more | Workday |
+| **Aptiv** | Braga | Workday |
+| **Deloitte** | Lisbon, Porto, Braga and more | SAP SuccessFactors |
+| **EY** | Lisbon, Porto, Braga | SAP SuccessFactors (sitemap) |
+| **Fujitsu** | Lisbon, Braga | SAP SuccessFactors (sitemap) |
+| **Uphold** | Braga | BambooHR |
+| **Mercedes-Benz.io** | Lisbon, Braga (hybrid) | Recruitee |
+| **Edigma** | Braga, Lisbon | Zoho Recruit |
+| **Eurotux** | Braga | Its jobs page |
+| **Euronext** (not in the example: no jobs in Braga) | Porto, Lisbon | Workday |
+
+When the same job shows up on two of them (a company's own page and ITJobs, say), it's one card with a link to each.
+
+LinkedIn, Indeed and Glassdoor are left out on purpose (see [Limitations](#limitations)).
 
 ## What it does
 
@@ -16,10 +50,18 @@ A local app that finds jobs in your area of Portugal across job boards and compa
 - **Your profile from your CV** (👤): drop your CV (PDF) and the AI fills in your name, contacts, skills, education, projects, experience and the jobs you're after; check and fix anything before saving, or fill it in by hand. Everything lands in `config.yaml`, which the score, the messages and the interview prep use.
 - **Writes a draft application message** (✉) in the posting's language, using only the facts in your profile, and honest about what you're missing.
 - **Prepares you for the interview** (🎯): what the job is looking for, likely technical and behavioural questions with hints from your profile, your gaps against the posting, and questions to ask the company.
-- **Tracks your applications**: mark jobs as saved, applied (with the date) or discarded, and write notes. Jobs you find elsewhere (LinkedIn, a friend…) can be added by hand.
+- **Shows what the jobs ask for** (📊 Market): the skills most asked for in the jobs it found, and which ones your profile already has, so you know what to learn next.
+- **Tracks your applications**: mark jobs as saved, applied (with the date) or discarded, and keep notes apart from the description. Jobs you find elsewhere (LinkedIn, a friend…) can be added by hand.
 - **Spots jobs that closed**: when a job disappears from its source, it's marked as no longer published.
 - **Português or English**: the PT/EN button changes the whole app, the error messages and what the AI writes for you.
 - **Light or dark**: the ☀/☾ button (until you choose, it follows your system).
+
+<p>
+  <img src="docs/profile.png" alt="Your profile, filled in from a CV" width="49%">
+  <img src="docs/market.png" alt="What the jobs ask for" width="49%">
+</p>
+
+<sub>Screenshots with a made-up profile and real jobs in Lisbon.</sub>
 
 ## Install and run
 
@@ -161,6 +203,7 @@ jobradar/
   scoring.py        keyword score + optional AI score (Gemini or Claude)
   message.py        application message and interview notes
   profile.py        the 👤 Profile screen: its fields, where they go in config.yaml, reading a CV with the AI
+  skills.py         the 📊 Market screen: the skills the jobs ask for most
   i18n.py           Português / English
   refresh.py        runs every source, filters, scores and stores; one failing source doesn't stop the rest
   discover.py       finds the careers sites of companies in your area

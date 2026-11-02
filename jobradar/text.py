@@ -44,3 +44,11 @@ def contains_term(normalized_text: str, term: str) -> bool:
 
 def matched_terms(normalized_text: str, terms: list[str]) -> list[str]:
     return [t for t in terms if contains_term(normalized_text, t)]
+
+
+_COMPANY_SUFFIXES = {"lda", "sa", "s", "a", "unipessoal", "portugal", "pt", "group", "grupo", "gmbh", "inc", "ltd"}
+
+
+def company_key(name: str | None) -> str:
+    """'Eurotux, S.A.' and 'EUROTUX' are the same company: lower case, no accents, punctuation or legal suffix."""
+    return " ".join(w for w in re.findall(r"[a-z0-9]+", normalize(name)) if w not in _COMPANY_SUFFIXES)

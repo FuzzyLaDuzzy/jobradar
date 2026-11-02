@@ -18,7 +18,7 @@ from jobradar.app import create_app
 
 ROOT = Path(__file__).resolve().parents[1]
 PDF = b"%PDF-1.4 a CV for the tests"
-AI_PROFILE = {"name": "Ana Costa", "signature": "912 345 678 · linkedin.com/in/anacosta",
+AI_PROFILE = {"name": "Ana Costa", "signature": "[phone] · linkedin.com/in/anacosta",
               "skills": ["Python", "SQL", "python", " React "], "focus": ["Backend"],
               "education": ["Licenciatura em Engenharia Informática, U. Porto (2026)"],
               "projects": ["App de reservas: React + Node, 200 utilizadores"], "experience": [],

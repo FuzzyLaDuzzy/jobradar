@@ -84,6 +84,7 @@ const EN = {
   "Nova": "New",
   "Localização por confirmar": "Location to be confirmed",
   "Candidatei-me a {date}": "Applied on {date}",
+  "também em {source}": "also on {source}",
   "Pede {n}+ anos": "Asks for {n}+ years",
   "Já não está publicada": "No longer published",
   "Descrição": "Description",
@@ -192,6 +193,20 @@ const EN = {
   "Em «API keys», carrega em «Create Key» e copia a chave.": "Under “API keys”, press “Create Key” and copy the key.",
   "Cola-a aqui e, no ⚙, muda scoring.llm.provider para anthropic.":
     "Paste it here and, with ⚙, change scoring.llm.provider to anthropic.",
+  // 📊 market
+  "Mercado": "Market",
+  "O que as vagas pedem": "What the jobs ask for",
+  "Competências mais pedidas nas {n} vagas relevantes e publicadas que a app encontrou, e as que o teu perfil já tem.":
+    "The skills asked for most in the {n} relevant, still-published jobs the app found, and the ones your profile already has.",
+  "Só as que me faltam": "Only the ones I'm missing",
+  "Ainda não há vagas para contar. Carrega em Procurar vagas.": "No jobs to count yet. Press Find jobs.",
+  "{n} vagas": "{n} jobs",
+  "tens": "you have it",
+  "falta": "missing",
+  "idioma": "language",
+  "Quando aprenderes uma, acrescenta-a no 👤 Perfil: passa a dar pontos nas vagas que a pedem.":
+    "When you learn one, add it in 👤 Profile: it then adds points to the jobs that ask for it.",
+  "Não foi possível contar as competências: {error}": "Couldn't count the skills: {error}",
   // 👤 profile
   "Perfil": "Profile",
   "O teu perfil": "Your profile",
@@ -323,6 +338,9 @@ createApp({
       newKeys: EMPTY_KEYS(),
       keysError: "",
       savingKeys: false,
+      marketOpen: false,
+      market: { jobs: 0, skills: [] },
+      marketMissingOnly: false,
       profileOpen: false,
       profile: null,
       profileExample: false,
@@ -581,6 +599,15 @@ createApp({
       if (data && data.example) this.openProfile(data);
     },
 
+    async openMarket() {
+      try {
+        this.market = await this.api("/api/market");
+        this.marketOpen = true;
+      } catch (e) {
+        this.showToast(this.t("Não foi possível contar as competências: {error}", { error: e.message }));
+      }
+    },
+
     async openProfile(data = null) {
       this.profileError = "";
       try {
@@ -775,7 +802,10 @@ createApp({
   mounted() {
     this.loadLanguage();
     this.load();
-    this.checkWelcome();
+    // links straight to a screen: /#mercado, /#perfil
+    if (location.hash === "#mercado") this.openMarket();
+    else if (location.hash === "#perfil") this.openProfile();
+    else this.checkWelcome();
   },
 })
   .component("chip-list", ChipList)
