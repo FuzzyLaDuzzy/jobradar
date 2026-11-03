@@ -16,10 +16,22 @@ from .text import contains_term, matched_terms, normalize
 _MULTI_LOCATION = re.compile(r"^\d+\s+(locations|localizacoes|locais)$")
 _REMOTE_WORDS = ["remote", "remoto", "teletrabalho"]
 _PORTUGAL_WORDS = ["portugal", "pt"]
-# Places outside the chosen area, used only when a job has no location field.
-# Main Portuguese cities only: a job naming a smaller town stays "unknown".
-_OTHER_PLACES = ["porto", "lisboa", "lisbon", "aveiro", "coimbra", "leiria", "setubal", "faro", "viseu",
-                 "evora", "maia", "matosinhos", "gaia", "oeiras", "sintra", "amadora", "cascais", "almada"]
+# Places outside the chosen area: in the title, or in the text when a job has no location field.
+# Main Portuguese cities only: a job naming a smaller town stays "unknown". Whichever of them is
+# in the chosen area counts as in it ("guarda" is left out: in Portuguese it is also a common verb).
+_OTHER_PLACES = ["porto", "lisboa", "lisbon", "braga", "aveiro", "coimbra", "leiria", "setubal", "faro", "viseu",
+                 "evora", "guimaraes", "braganca", "vila real", "viana do castelo", "castelo branco", "covilha",
+                 "santarem", "beja", "portalegre", "funchal", "ponta delgada",
+                 "maia", "matosinhos", "gaia", "oeiras", "sintra", "amadora", "cascais", "almada"]
+# A title that sends the job abroad: "Relocate to Greece", "Work Remotely from Greece", "based in Athens"
+_ELSEWHERE_RE = re.compile(r"\b(?:relocat\w*|based in|work(?:ing)?(?: remotely)? from (?!home\b))")
+
+
+def _title_elsewhere(title: str, search: dict) -> bool:
+    """The title puts the job somewhere else ("Engineer - Lisbon Based"), whatever the location field says."""
+    if matched_terms(title, search.get("locations") or []):
+        return False  # "Porto or Braga": the area is one of the places
+    return bool(matched_terms(title, _OTHER_PLACES) or _ELSEWHERE_RE.search(title))
 
 _YEARS_PATTERNS = [
     # "3+ years of experience", "2-4 years of professional experience", "3 anos de experiência"
@@ -34,6 +46,8 @@ _YEARS_PATTERNS = [
 
 def location_status(job: Job, search: dict) -> bool | None:
     """True = in an accepted area, False = outside, None = unknown."""
+    if _title_elsewhere(normalize(job.title), search):
+        return False
     loc = normalize(job.location).strip()
     if not loc or _MULTI_LOCATION.match(loc):
         # ITJobs sends remote jobs with no location at all

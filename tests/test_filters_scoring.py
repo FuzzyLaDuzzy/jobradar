@@ -86,6 +86,27 @@ def test_missing_location_read_from_the_text(cfg):
     assert quick_reject(job(location="", description="Python e SQL"), search) is None  # unknown: keep
 
 
+@pytest.mark.parametrize("title", [
+    "Telecom Billing Software Engineer - Lisbon Based",  # Workable says Braga, the title says Lisbon
+    "Portuguese Customer Agent for E-Commerce Platform - Work Remotely from Greece",
+    "Portuguese Social Media and AI Content Specialist - Relocate to Greece",
+    "Software Engineer (Porto)",
+])
+def test_title_naming_another_place_wins(cfg, title):
+    assert quick_reject(job(title=title, location="Braga"), cfg["search"]) == "fora da zona"
+
+
+def test_title_naming_a_place_of_the_area_is_kept(cfg):
+    search = cfg["search"]
+    assert quick_reject(job(title="Software Engineer (Porto or Braga)", location="Braga"), search) is None
+    assert quick_reject(job(title="Software Engineer - Work from Home", location="Braga"), search) is None
+    # any area: for someone in Lisbon, "Lisbon Based" is home
+    lisbon = {**search, "locations": ["lisboa", "lisbon", "oeiras"]}
+    assert quick_reject(job(title="Software Engineer - Lisbon Based", location="Lisboa"), lisbon) is None
+    assert quick_reject(job(title="Software Engineer - Braga Based", location="Lisboa"), lisbon) == "fora da zona"
+    assert quick_reject(job(location="", description="Escritório em Braga"), lisbon) == "fora da zona"
+
+
 def test_remote_portugal_allowed_when_enabled(cfg):
     search = {**cfg["search"], "allow_remote": True}
     assert quick_reject(job(location="Remote, Portugal"), search) is None

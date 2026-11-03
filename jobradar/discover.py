@@ -44,6 +44,7 @@ ENTRIES = {
     "smartrecruiters": lambda name, slug: {"company": slug, "country": "pt"},
     "recruitee": lambda name, slug: {"company": slug, "name": name},
     "teamtailor": lambda name, slug: {"company": slug, "name": name},
+    "greenhouse": lambda name, slug: {"company": slug, "name": name},
 }
 _SUFFIXES = {"lda", "sa", "s", "a", "unipessoal", "portugal", "pt", "group", "grupo"}
 

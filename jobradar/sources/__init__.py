@@ -1,7 +1,7 @@
 """Source connectors. Each `fetch(client, entry, prefilter)` returns a list of Jobs."""
 
-from . import (balancasmarques, bamboohr, eurotux, itjobs, landingjobs, lever, netempregos, randstad, recruitee, smartrecruiters,
-               successfactors, sysmatch, teamtailor, workday, zohorecruit)
+from . import (balancasmarques, bamboohr, eurotux, greenhouse, itjobs, landingjobs, lever, netempregos, randstad, recruitee, smartrecruiters,
+               successfactors, sysmatch, teamtailor, workable, workday, workinbraga, zohorecruit)
 from .base import SourceSkipped, make_client
 
 FETCHERS = {
@@ -13,6 +13,7 @@ FETCHERS = {
     "recruitee": recruitee.fetch,
     "zohorecruit": zohorecruit.fetch,
     "teamtailor": teamtailor.fetch,
+    "greenhouse": greenhouse.fetch,
     "itjobs": itjobs.fetch,
     "landingjobs": landingjobs.fetch,
     "netempregos": netempregos.fetch,
@@ -20,6 +21,8 @@ FETCHERS = {
     "sysmatch": sysmatch.fetch,
     "eurotux": eurotux.fetch,
     "balancasmarques": balancasmarques.fetch,
+    "workable": workable.fetch,
+    "workinbraga": workinbraga.fetch,
 }
 
 # Which config field names each entry (used in the source label).
@@ -32,6 +35,7 @@ LABEL_FIELD = {
     "recruitee": "company",
     "zohorecruit": "name",
     "teamtailor": "company",
+    "greenhouse": "company",
     "itjobs": None,
     "landingjobs": None,
     "netempregos": None,
@@ -39,6 +43,8 @@ LABEL_FIELD = {
     "sysmatch": None,
     "eurotux": None,
     "balancasmarques": None,
+    "workable": None,
+    "workinbraga": None,
 }
 
 REQUIRED_FIELDS = {
@@ -50,6 +56,7 @@ REQUIRED_FIELDS = {
     "recruitee": ["company"],
     "zohorecruit": ["name", "url"],
     "teamtailor": ["company"],
+    "greenhouse": ["company"],
     "itjobs": [],
     "landingjobs": [],
     "netempregos": [],
@@ -57,6 +64,8 @@ REQUIRED_FIELDS = {
     "sysmatch": [],
     "eurotux": [],
     "balancasmarques": [],
+    "workable": [],
+    "workinbraga": [],
 }
 
 
@@ -67,6 +76,7 @@ def with_area(kind: str, entry: dict, search: dict) -> dict:
     defaults = {
         "workday": {"search": places},
         "successfactors": {"location": places},
+        "workable": {"location": places},
         "itjobs": {"location_names": search.get("locations") or []},
     }
     return {**defaults.get(kind, {}), **entry}

@@ -17,6 +17,8 @@ Out of the box ([`config.example.yaml`](config.example.yaml)) it reads these job
 | **Net-Empregos** | Official RSS feed |
 | **Randstad** (incl. Randstad Digital) | Official RSS feed |
 | **Sysmatch** | Its jobs page |
+| **Workable** (every company on Workable, searched in your area) | Public job search |
+| **Work in Braga** (InvestBraga's job board, where companies post themselves) | Its jobs page |
 
 | Company | Platform |
 |---|---|
@@ -35,6 +37,19 @@ Out of the box ([`config.example.yaml`](config.example.yaml)) it reads these job
 | **Balanças Marques** and **SDILAB** (same group) | Their jobs page |
 | **Nutrium** | Teamtailor |
 | **Coverflex** | Teamtailor |
+| **Devoteam** | SmartRecruiters |
+| **Jscrambler** | SmartRecruiters |
+| **Ubiwhere** | SmartRecruiters |
+| **Tonic App** | SmartRecruiters |
+| **Euronext** | Workday |
+| **HUUB** | Recruitee |
+| **Infraspeak** | Teamtailor |
+| **Celfocus** | Teamtailor |
+| **Critical TechWorks** | Teamtailor |
+| **Feedzai** | Greenhouse |
+| **Sword Health** | Greenhouse |
+| **Cloudflare** | Greenhouse |
+| **Jumia** | Greenhouse |
 
 When the same job shows up on two of them (a company's own page and ITJobs, say), it's one card with a link to each.
 
@@ -45,9 +60,10 @@ LinkedIn, Indeed and Glassdoor are left out on purpose (see [Limitations](#limit
 - **Reads many sources** through the public APIs and feeds that the sites themselves publish:
   - **ITJobs.pt**, the main Portuguese IT job board (free read-only key)
   - **Landing.jobs**, **Net-Empregos** and **Randstad**, through their official feeds
-  - **Sysmatch**, **Eurotux** and **Balanças Marques** (with SDILAB), from their jobs pages
-  - **Company careers sites** on SmartRecruiters, Lever, Workday, SAP SuccessFactors, BambooHR, Recruitee, Zoho Recruit and Teamtailor (Bosch, Farfetch, Accenture, Deloitte, EY, Fujitsu, Mercedes-Benz.io, Edigma, Nutrium… or any company you add)
-- **Filters** by your area, the kind of job (words the title must have), your level (junior words, senior words to skip), excluded words and companies, job age and typical scam signs. When a source doesn't say where the job is, it looks for the city in the description.
+  - **Sysmatch**, **Work in Braga**, **Eurotux** and **Balanças Marques** (with SDILAB), from their jobs pages
+  - **Workable**'s public job search, in your area: every company that hires through Workable, even the ones you've never heard of
+  - **Company careers sites** on SmartRecruiters, Lever, Workday, SAP SuccessFactors, BambooHR, Recruitee, Zoho Recruit, Teamtailor and Greenhouse, from companies all over Portugal (Bosch, Farfetch, Accenture, Deloitte, Devoteam, Feedzai, Sword Health, Cloudflare, Celfocus… or any company you add); each keeps only the jobs in your area
+- **Filters** by your area, the kind of job (words the title must have), your level (junior words, senior words to skip), excluded words and companies, job age and typical scam signs. When a source doesn't say where the job is, it looks for the city in the description; when the title names a city outside your area ("Lisbon Based", "Relocate to…"), the title wins.
 - **Scores each job from 0 to 100** from keywords (level, area, your skills and interests), with a penalty for jobs that ask for 3+ years. With an AI key, an LLM also scores each new job against your profile and writes one sentence on why.
 - **Your profile from your CV** (👤): drop your CV (PDF) and the AI fills in your name, contacts, skills, education, projects, experience and the jobs you're after; check and fix anything before saving, or fill it in by hand. Everything lands in `config.yaml`, which the score, the messages and the interview prep use.
 - **Writes a draft application message** (✉) in the posting's language, using only the facts in your profile, and honest about what you're missing.
@@ -152,6 +168,7 @@ To add a company by hand, open one of its job pages and look at the domain of th
 | Recruitee | `<company>.recruitee.com` (the apply links say which) | `- company: mbio`<br>`  name: Mercedes-Benz.io` |
 | Zoho Recruit | careers pages ending in `/jobs/Careers` | `- name: Edigma`<br>`  url: https://careers.edigma.com/jobs/Careers` |
 | Teamtailor | `<company>.teamtailor.com`; a site on its own domain also works (`url:`) | `- company: nutrium`<br>`  name: Nutrium` |
+| Greenhouse | `job-boards.greenhouse.io/<company>` | `- company: swordhealth`<br>`  name: Sword Health` |
 
 ## Run it automatically
 

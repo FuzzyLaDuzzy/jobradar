@@ -14,7 +14,7 @@ STATUSES = ("nova", "guardada", "candidatei", "descartada")
 
 
 # job boards and agencies that repost companies' jobs: the company's own posting is the one kept
-AGGREGATORS = {"itjobs", "landingjobs", "netempregos", "randstad", "sysmatch"}
+AGGREGATORS = {"itjobs", "landingjobs", "netempregos", "randstad", "sysmatch", "workable", "workinbraga"}
 
 
 _GENDER_RE = re.compile(r"\((?:[mfhxd]\s*/\s*)+[a-z]+\.?\)")  # (m/f), (f/m/x), (f/m/div.), (h/m)

@@ -1,4 +1,5 @@
-"""Recruitee (Mercedes-Benz.io), Zoho Recruit (Edigma), Eurotux, Teamtailor (Nutrium) and Balanças Marques (with SDILAB),
+"""Recruitee (Mercedes-Benz.io), Zoho Recruit (Edigma), Eurotux, Teamtailor (Nutrium), Balanças Marques (with SDILAB),
+Workable (search by place), Work in Braga and Greenhouse (Sword Health),
 from real answers cut down to a few fields."""
 
 import html
@@ -7,7 +8,8 @@ import json
 import httpx
 import pytest
 
-from jobradar.sources import balancasmarques, eurotux, recruitee, teamtailor, zohorecruit
+from jobradar.sources import (balancasmarques, eurotux, greenhouse, recruitee, teamtailor, with_area, workable, workinbraga,
+                              zohorecruit)
 
 # --- Recruitee ---------------------------------------------------------------
 
@@ -208,3 +210,115 @@ def test_balancasmarques_list_and_detail(make_client):
     assert job.url == "https://www.balancasmarques.com/vagas/agentic-development-engineer/"
     assert job.description == "Quem somos\nSomos a software house que desenvolve o ETPOS."
     assert jobs[1].company == "Balanças Marques"  # list data only, until the detail says otherwise
+
+
+# --- Workable (search by place) ----------------------------------------------
+
+WORKABLE_PAGE_1 = {"totalSize": 3, "nextPageToken": "tok2", "jobs": [
+    {"id": "f8579e19", "title": "Telecom Billing Software Engineer", "employmentType": "Full-time",
+     "description": "<p>Join 1GLOBAL.</p>", "requirementsSection": "<ul><li>Java</li></ul>", "benefitsSection": "",
+     "url": "https://jobs.workable.com/view/abc/telecom-billing-software-engineer-in-braga-at-1global",
+     "locations": ["Braga, Braga, Portugal"], "location": {"city": "Braga", "subregion": "Braga", "countryName": "Portugal"},
+     "created": "2026-10-16T09:12:00.000Z", "workplace": "on_site",
+     "company": {"title": "1GLOBAL", "image": "https://workablehr.s3.amazonaws.com/uploads/account/logo/1/logo"}},
+    {"id": "a1b2c3d4", "title": "LQA Game Tester (Italian) - Freelance Remote", "employmentType": "Other",
+     "description": "<p>Side is a global video game services provider.</p>", "url": "https://jobs.workable.com/view/def/lqa",
+     "locations": ["TELECOMMUTE", "Braga, Braga, Portugal"], "location": {"city": "Braga", "countryName": "Portugal"},
+     "created": "2026-09-18T10:00:00.000Z", "workplace": "remote", "company": {"title": "Side"}}]}
+WORKABLE_PAGE_2 = {"totalSize": 3, "jobs": [
+    {"id": "e5f6", "title": "UI/UX Designer", "location": {"city": "Maia"}, "created": "2026-10-20T08:00:00.000Z",
+     "workplace": "hybrid", "url": "https://jobs.workable.com/view/ghi/ui", "company": {"title": "Critical Manufacturing"}},
+    WORKABLE_PAGE_1["jobs"][0]]}  # the next page can repeat a job
+
+
+def test_workable_searches_the_area_page_by_page(make_client):
+    seen = []
+
+    def handler(request):
+        seen.append(dict(request.url.params))
+        return httpx.Response(200, json=WORKABLE_PAGE_2 if request.url.params.get("pageToken") else WORKABLE_PAGE_1)
+
+    entry = with_area("workable", {}, {"locations_primary": ["braga"], "locations": ["braga", "guimaraes"]})
+    jobs = workable.fetch(make_client(handler), entry)
+    assert seen == [{"location": "braga"}, {"location": "braga", "pageToken": "tok2"}]
+    assert [j.title for j in jobs] == ["Telecom Billing Software Engineer", "LQA Game Tester (Italian) - Freelance Remote",
+                                       "UI/UX Designer"]
+    billing, tester, designer = jobs
+    assert (billing.uid, billing.company, billing.location) == ("workable:f8579e19", "1GLOBAL", "Braga")
+    assert (billing.posted_at, billing.contract, billing.work_model) == ("2026-10-16", "Full-time", "on-site")
+    assert billing.description == "Join 1GLOBAL.\nJava" and billing.logo.endswith("/logo")
+    assert (tester.contract, tester.work_model) == ("", "remote")  # "Other" says nothing
+    assert (designer.location, designer.work_model) == ("Maia", "hybrid")  # nearby: the filters decide
+
+
+# --- Work in Braga -----------------------------------------------------------
+
+def _offer(node, title, company):
+    return (f'<div class="job-offer-card"><a href="https://workinbraga.pt/node/{node}">\n'
+            f'    <div class="job-offer-regime">Regime Integral</div>\n'
+            f'    <div class="job-offer-title">{title}</div>\n'
+            f'    <div class="job-offer-company">{company}</div>\n  </a></div>')
+
+
+WIB_PAGE_0 = (_offer("8880", "Security Researcher", "Checkmarx Portugal ")
+              + _offer("8853", "Assistente Comercial Internacional - Backoffice (m ...", "Grupo Navarra")
+              + '<a href="?job=&amp;professional_category=All&amp;page=1">Seguinte</a>')
+WIB_PAGE_1 = _offer("8875", "Consultor/a de Conformidade e Regulamenta&ccedil;&atilde;o ", "Eurotux Inform&aacute;tica, S.A.")
+WIB_DETAIL = ('<article class="node node--type-job-offer"><div class="col-sm-8"><div class="col-sm-12 job-card-header">'
+              '<div class="job-offer-header"><h3>Checkmarx Portugal </h3><h1>Security Researcher</h1></div>'
+              '<div class="job-regime col-sm-3"><p>Regime Integral</p></div>'
+              '<div class="job-posted-date col-sm-3"><p>Colocado em 24/09/2026</p></div></div>'
+              '<div class="col-sm-12 job-card-content"><div class="job-role-description"><p><strong>Who are we?</strong></p></div>'
+              '<div class="job-required-skills"><h2>Competências necessárias:</h2><ul><li>Application Security</li></ul></div></div>'
+              '<div class="col-sm-12 job-card-actions"><a href="/node/add/job_application?id=8880">Candidatar-me</a></div></div>'
+              '<div class="col-sm-4 right-side-wrapper"><div class="company-logo"> <img src="/sites/default/files/logo.png?itok=x" ></div>'
+              '<div class="company-email"><a href="mailto:recruiter@example.com">Contacto</a></div></div></article>')
+
+
+def test_workinbraga_list_and_detail(make_client):
+    seen = []
+
+    def handler(request):
+        seen.append(str(request.url).replace("https://workinbraga.pt", ""))
+        if request.url.path == "/job-offers":
+            return httpx.Response(200, text=WIB_PAGE_1 if request.url.params["page"] == "1" else WIB_PAGE_0)
+        return httpx.Response(200, text=WIB_DETAIL)
+
+    jobs = workinbraga.fetch(make_client(handler), {}, prefilter=lambda job: "Security" in job.title)
+    assert seen == ["/job-offers?page=0", "/job-offers?page=1", "/node/8880"]  # no page for the other offers
+    researcher, assistant, consultant = jobs
+    assert (researcher.uid, researcher.company, researcher.location) == ("workinbraga:8880", "Checkmarx Portugal", "Braga")
+    assert (researcher.posted_at, researcher.contract) == ("2026-09-24", "Regime Integral")
+    assert researcher.description == "Who are we?\nCompetências necessárias:\nApplication Security"
+    assert "recruiter@" not in researcher.description  # the company card is left out
+    assert researcher.logo == "https://workinbraga.pt/sites/default/files/logo.png?itok=x"
+    assert assistant.title == "Assistente Comercial Internacional - Backoffice (m"  # cut by the list, no "..."
+    assert (consultant.title, consultant.company) == ("Consultor/a de Conformidade e Regulamentação", "Eurotux Informática, S.A.")
+
+
+# --- Greenhouse --------------------------------------------------------------
+
+GREENHOUSE_JOBS = {"meta": {"total": 2}, "jobs": [
+    {"id": 4434773009, "title": "Software Engineer", "company_name": "Sword", "location": {"name": "Hybrid - Lisbon"},
+     "absolute_url": "https://job-boards.greenhouse.io/swordhealth/jobs/4434773009",
+     "first_published": "2026-10-09T05:39:26-04:00", "updated_at": "2026-10-26T08:28:09-04:00",
+     "content": "&lt;p&gt;At Sword, we&amp;rsquo;re building AI Care.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Python&lt;/li&gt;&lt;/ul&gt;"},
+    {"id": 4434773010, "title": "Data Analyst", "company_name": "Sword", "location": {"name": "Remote - Portugal"},
+     "absolute_url": "https://job-boards.greenhouse.io/swordhealth/jobs/4434773010", "updated_at": "2026-10-20T10:00:00-04:00",
+     "content": ""}]}
+
+
+def test_greenhouse_board(make_client):
+    seen = []
+
+    def handler(request):
+        seen.append(str(request.url))
+        return httpx.Response(200, json=GREENHOUSE_JOBS)
+
+    engineer, analyst = greenhouse.fetch(make_client(handler), {"company": "swordhealth", "name": "Sword Health"})
+    assert seen == ["https://boards-api.greenhouse.io/v1/boards/swordhealth/jobs?content=true"]  # one request
+    assert (engineer.uid, engineer.company, engineer.location) == ("greenhouse:swordhealth:4434773009", "Sword Health",
+                                                                   "Hybrid - Lisbon")
+    assert (engineer.posted_at, engineer.work_model) == ("2026-10-09", "hybrid")
+    assert engineer.description == "At Sword, we’re building AI Care.\nPython"  # escaped HTML, read as HTML
+    assert (analyst.posted_at, analyst.work_model) == ("2026-10-20", "remote")  # no first_published: updated_at

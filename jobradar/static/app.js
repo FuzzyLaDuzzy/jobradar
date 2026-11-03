@@ -3,7 +3,7 @@ const { createApp } = Vue;
 const STORAGE_KEY = "jobradar.filters";
 const SOURCE_NAMES = {
   itjobs: "ITJobs", sysmatch: "Sysmatch", landingjobs: "Landing.jobs", netempregos: "Net-Empregos", randstad: "Randstad",
-  manual: "Adicionada por ti", balancasmarques: "Balanças Marques",
+  manual: "Adicionada por ti", balancasmarques: "Balanças Marques", workable: "Workable", workinbraga: "Work in Braga",
 };
 const WORK_MODELS = { remote: "Remoto", hybrid: "Híbrido", "on-site": "Presencial", onsite: "Presencial" };
 const EMPTY_JOB = () => ({ title: "", company: "", url: "", location: "", notes: "" });
@@ -281,7 +281,7 @@ function loadFilters() {
 const PROFILE_SEEN_KEY = "jobradar.profileSeen";
 // sources that list other companies' jobs by the company's name: their cards offer "Follow company"
 // (not Sysmatch or Randstad: they are agencies and their jobs name the agency, never the client)
-const FOLLOWABLE = new Set(["itjobs", "landingjobs", "netempregos", "manual"]);
+const FOLLOWABLE = new Set(["itjobs", "landingjobs", "netempregos", "workinbraga", "manual"]);
 const PLATFORM_NAMES = {
   smartrecruiters: "SmartRecruiters", lever: "Lever", bamboohr: "BambooHR", recruitee: "Recruitee",
   greenhouse: "Greenhouse", workable: "Workable", ashby: "Ashby", personio: "Personio", breezy: "Breezy HR", teamtailor: "Teamtailor",

@@ -65,8 +65,9 @@ search:
                   nao remunerado, unpaid]
   max_age_days: 120           # skip jobs posted more than N days ago
 
-# Where to look. Run `python -m jobradar discover` to find the companies in your area;
-# the README explains how to add each platform.
+# Where to look. The companies below are spread across Portugal and each source keeps only the
+# jobs in your area, so the list works wherever you are. Run `python -m jobradar discover` to find
+# more companies in your area; the README explains how to add each platform.
 sources:
   itjobs:                     # needs ITJOBS_API_KEY in .env (free at itjobs.pt/api)
     - queries: [junior, trainee, estagio, graduate]
@@ -82,13 +83,17 @@ sources:
       logo: https://www.google.com/s2/favicons?domain=randstad.pt&sz=128
   sysmatch:                   # sysmatch.com/job-opportunities
     - company: Sysmatch
-  # Companies of this example's area (Braga)
-  eurotux:                    # eurotux.com/careers
+  workable:                   # jobs.workable.com: every company on Workable with jobs in your area (from `search`)
+    - {}
+  # Companies' own careers sites
+  eurotux:                    # eurotux.com/careers (Braga)
     - company: Eurotux
       logo: https://www.google.com/s2/favicons?domain=eurotux.com&sz=128
   balancasmarques:            # balancasmarques.com/recrutamento, also SDILAB's jobs (same group)
     - company: Balanças Marques
       logo: https://www.google.com/s2/favicons?domain=balancasmarques.com&sz=128
+  workinbraga:                # workinbraga.pt, InvestBraga's job board (Braga only): companies post there (Checkmarx too)
+    - {}
   zohorecruit:               # Zoho Recruit careers sites (careers.<company>.../jobs/Careers)
     - name: Edigma
       url: https://careers.edigma.com/jobs/Careers
@@ -97,6 +102,9 @@ sources:
     - company: mbio
       name: Mercedes-Benz.io  # offices in Lisbon and Braga
       logo: https://www.google.com/s2/favicons?domain=mercedes-benz.io&sz=128
+    - company: huub
+      name: HUUB
+      logo: https://www.google.com/s2/favicons?domain=thehuub.io&sz=128
   teamtailor:                 # https://<company>.teamtailor.com (or `url:` for a site on its own domain)
     - company: nutrium
       name: Nutrium
@@ -104,6 +112,29 @@ sources:
     - company: coverflex
       name: Coverflex
       logo: https://www.google.com/s2/favicons?domain=coverflex.com&sz=128
+    - company: infraspeak
+      name: Infraspeak
+      logo: https://www.google.com/s2/favicons?domain=infraspeak.com&sz=128
+    - company: celfocus
+      name: Celfocus
+      logo: https://www.google.com/s2/favicons?domain=celfocus.com&sz=128
+    - company: criticaltechworks
+      name: Critical TechWorks
+      url: https://join.criticaltechworks.com
+      logo: https://www.google.com/s2/favicons?domain=criticaltechworks.com&sz=128
+  greenhouse:                 # https://job-boards.greenhouse.io/<company>
+    - company: feedzai
+      name: Feedzai
+      logo: https://www.google.com/s2/favicons?domain=feedzai.com&sz=128
+    - company: swordhealth
+      name: Sword Health
+      logo: https://www.google.com/s2/favicons?domain=swordhealth.com&sz=128
+    - company: cloudflare
+      name: Cloudflare
+      logo: https://www.google.com/s2/favicons?domain=cloudflare.com&sz=128
+    - company: jumia
+      name: Jumia
+      logo: https://www.google.com/s2/favicons?domain=jumia.com&sz=128
   # Large companies with offices in several cities. Each searches your primary places
   # unless the entry sets its own `search` (Workday) or `location` (SuccessFactors).
   smartrecruiters:            # https://jobs.smartrecruiters.com/<company>
@@ -113,6 +144,18 @@ sources:
     - company: continental    # jobs in Lousado (Famalicão)
       country: pt
       logo: https://www.google.com/s2/favicons?domain=continental.com&sz=128
+    - company: devoteam
+      country: pt
+      logo: https://www.google.com/s2/favicons?domain=devoteam.com&sz=128
+    - company: jscrambler
+      country: pt
+      logo: https://www.google.com/s2/favicons?domain=jscrambler.com&sz=128
+    - company: ubiwhere
+      country: pt
+      logo: https://www.google.com/s2/favicons?domain=ubiwhere.com&sz=128
+    - company: tonicapp
+      country: pt
+      logo: https://www.google.com/s2/favicons?domain=tonicapp.com&sz=128
   lever:                      # https://jobs.lever.co/<site>
     - site: farfetch
       company: FARFETCH
@@ -124,6 +167,9 @@ sources:
     - name: Aptiv
       url: https://aptiv.wd5.myworkdayjobs.com/APTIV_CAREERS
       logo: https://www.google.com/s2/favicons?domain=aptiv.com&sz=128
+    - name: Euronext
+      url: https://hrhub.wd3.myworkdayjobs.com/Euronext_Career_Page
+      logo: https://www.google.com/s2/favicons?domain=euronext.com&sz=128
   bamboohr:                   # https://<site>.bamboohr.com/careers
     - name: Uphold
       site: uphold
