@@ -131,7 +131,7 @@
           <p class="desc muted" v-else>{{ t('Sem descrição. Abre a vaga para ver os detalhes.') }}</p>
           <div class="ai">
             <div class="ai-actions">
-              <button class="btn" @click="generate(j, 'message')" :disabled="j.messageBusy">
+              <button class="btn" @click="generate(j, 'message', j.messageLanguage)" :disabled="j.messageBusy">
                 <span v-if="j.messageBusy" class="spinner"></span>
                 {{ j.messageBusy ? t('A escrever…') : (j.message ? t('↻ Outra versão da mensagem') : t('✉ Gerar mensagem de candidatura')) }}
               </button>
@@ -146,6 +146,10 @@
                 <textarea class="ai-text" v-model="j[kind]"
                           :aria-label="kind === 'message' ? t('Rascunho da mensagem') : t('Preparação da entrevista')"></textarea>
                 <button class="btn" @click="copyText(j[kind])">{{ t('Copiar') }}</button>
+                <button class="btn" v-if="kind === 'message'" :disabled="j.messageBusy"
+                        @click="generate(j, 'message', otherLanguage(j.message))">
+                  {{ otherLanguage(j.message) === 'en' ? t('Reescrever em inglês') : t('Reescrever em português') }}
+                </button>
               </template>
             </template>
           </div>

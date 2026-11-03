@@ -8,6 +8,7 @@ import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Literal
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI, HTTPException, Request
@@ -285,8 +286,9 @@ def create_app(
         return {"profile": with_ai(lambda cfg: profile.read_cv(pdf, cfg, llm_client))}
 
     @app.post("/api/jobs/{uid:path}/message")
-    def job_message(uid: str):
-        return ai_text(uid, message.write)
+    def job_message(uid: str, language: Literal["pt", "en"] | None = None):
+        """language: the draft's "Rewrite in…" button; by default the message follows the posting."""
+        return ai_text(uid, lambda job, cfg, client: message.write(job, cfg, client, language))
 
     @app.post("/api/jobs/{uid:path}/interview")
     def job_interview(uid: str):

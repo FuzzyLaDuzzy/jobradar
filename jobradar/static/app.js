@@ -92,6 +92,8 @@ const EN = {
   "Notas (ex.: enviei o CV a 30/10, contacto da recrutadora…)": "Notes (e.g. sent my CV on 30/10, the recruiter's contact…)",
   "A escrever…": "Writing…",
   "↻ Outra versão da mensagem": "↻ Another version of the message",
+  "Reescrever em inglês": "Rewrite in English",
+  "Reescrever em português": "Rewrite in Portuguese",
   "✉ Gerar mensagem de candidatura": "✉ Write application message",
   "A preparar…": "Preparing…",
   "↻ Preparar de novo": "↻ Prepare again",
@@ -548,18 +550,26 @@ createApp({
       }
     },
 
-    // kind: "message" (application message) or "interview" (interview prep), same endpoint name
-    async generate(job, kind) {
+    // kind: "message" (application message) or "interview" (interview prep), same endpoint name;
+    // language: "pt" or "en" to choose the message's language (by default, the posting's)
+    async generate(job, kind, language) {
       job[kind + "Busy"] = true;
       job[kind + "Error"] = "";
       try {
-        const { text } = await this.api(`/api/jobs/${encodeURIComponent(job.uid)}/${kind}`, { method: "POST" });
+        const query = language ? `?language=${language}` : "";
+        const { text } = await this.api(`/api/jobs/${encodeURIComponent(job.uid)}/${kind}${query}`, { method: "POST" });
         job[kind] = text;
+        if (language) job.messageLanguage = language; // "Another version" keeps it
       } catch (e) {
         job[kind + "Error"] = this.t("Não foi possível gerar: {error}", { error: e.message });
       } finally {
         job[kind + "Busy"] = false;
       }
+    },
+
+    // the other language for the draft's button, from its first line: "Assunto: ..." or "Subject: ..."
+    otherLanguage(text) {
+      return /^\s*assunto\b/i.test(text || "") ? "en" : "pt";
     },
 
     async copyText(text) {

@@ -20,12 +20,19 @@ API = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateC
 class GeminiError(RuntimeError):
     """Gemini answered with an error, blocked the request or returned no text."""
 
+    def __init__(self, message: str, status: int | None = None):
+        super().__init__(message)
+        self.status = status  # the HTTP status when Gemini answered with an error
+
+
+BUSY = (429, 503)  # out of free quota (counted per model) or overloaded: another model may still answer
+
 
 def _fail(resp: httpx.Response) -> GeminiError:
     if resp.status_code == 429:
-        return GeminiError(t("Atingiste o limite do plano gratuito do Gemini. Tenta daqui a uns minutos."))
+        return GeminiError(t("Atingiste o limite do plano gratuito do Gemini. Tenta daqui a uns minutos."), 429)
     if resp.status_code == 503:  # "The model is overloaded": it passes on its own
-        return GeminiError(t("O Gemini está com muita procura neste momento. Tenta daqui a uns minutos."))
+        return GeminiError(t("O Gemini está com muita procura neste momento. Tenta daqui a uns minutos."), 503)
     if resp.status_code in (401, 403):
         return GeminiError(t("A GEMINI_API_KEY foi recusada. Cria uma chave nova no Google AI Studio."))
     try:

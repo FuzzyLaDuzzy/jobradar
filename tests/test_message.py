@@ -65,3 +65,14 @@ def test_message_endpoint(tmp_path, monkeypatch):
     assert tc.post(f"/api/jobs/{uid}/interview").json() == {"text": llm.text}
     assert "entrevista" in llm.calls[-1]["system"]
     assert tc.post("/api/jobs/nao-existe/message").status_code == 404
+
+    # the draft's "Rewrite in…" button: the posting's language by default, or the one chosen
+    tc.post(f"/api/jobs/{uid}/message")
+    assert message.POSTING_LANGUAGE in llm.calls[-1]["system"]
+    assert tc.post(f"/api/jobs/{uid}/message?language=en").json() == {"text": llm.text}
+    system = llm.calls[-1]["system"]
+    assert "Escreve em inglês, seja qual for a língua do anúncio." in system and message.POSTING_LANGUAGE not in system
+    assert str(llm.calls[-1]["messages"]).endswith(message.WRITE_IN["en"] + "'}]")  # asked again, last, in English
+    tc.post(f"/api/jobs/{uid}/message?language=pt")
+    assert "Escreve em português europeu, seja qual for" in llm.calls[-1]["system"]
+    assert tc.post(f"/api/jobs/{uid}/message?language=fr").status_code == 422

@@ -94,7 +94,13 @@ def _generate(system: str, prompt: str, cfg: dict, client=None, pdf: bytes | Non
     settings = llm_settings(cfg)
     model = settings["model"] if light else settings["message_model"]
     if settings["provider"] == "gemini":
-        return gemini.generate(prompt, model, system=system, client=client, pdf=pdf)
+        try:
+            return gemini.generate(prompt, model, system=system, client=client, pdf=pdf)
+        except gemini.GeminiError as exc:
+            # the bigger model is the first to be busy or out of free quota: the light one usually still answers
+            if exc.status not in gemini.BUSY or model == settings["model"]:
+                raise
+            return gemini.generate(prompt, settings["model"], system=system, client=client, pdf=pdf)
     if client is None:
         import anthropic
 
@@ -122,9 +128,22 @@ def _generate(system: str, prompt: str, cfg: dict, client=None, pdf: bytes | Non
     return text
 
 
-def write(job: dict, cfg: dict, client=None) -> str:
-    prompt = _prompt(job, cfg.get("profile") or {}, "Escreve a mensagem de candidatura para esta vaga.")
-    return _generate(SYSTEM, prompt, cfg, client)
+POSTING_LANGUAGE = "- Escreve na língua do anúncio: inglês se o anúncio estiver em inglês, português europeu se estiver em português."
+# asked again at the end, in that language: with Portuguese rules and a Portuguese posting, the light
+# model kept writing Portuguese under an English "Subject:"
+WRITE_IN = {"pt": "Escreve a mensagem toda em português europeu: assunto, saudação, corpo e despedida.",
+            "en": "Write the whole message in English: subject, greeting, body and sign-off."}
+
+
+def write(job: dict, cfg: dict, client=None, language: str | None = None) -> str:
+    """language: "pt" or "en" to choose it (the draft's button); by default, the posting's language."""
+    system, ask = SYSTEM, "Escreve a mensagem de candidatura para esta vaga."
+    if language in WRITE_IN:  # the rule is replaced: a second, contradicting one could lose
+        name = INTERVIEW_LANGUAGES[language][0]
+        system = SYSTEM.replace(POSTING_LANGUAGE, f"- Escreve em {name}, seja qual for a língua do anúncio.")
+        ask += "\n" + WRITE_IN[language]
+    prompt = _prompt(job, cfg.get("profile") or {}, ask)
+    return _generate(system, prompt, cfg, client)
 
 
 def interview(job: dict, cfg: dict, client=None) -> str:

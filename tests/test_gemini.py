@@ -99,3 +99,33 @@ def test_message_with_gemini(cfg, monkeypatch):
 
     job = {"title": "QA Analyst", "company": "Uphold", "description": "Testing"}
     assert message.write(job, gemini_cfg(cfg), client(handler)) == "Subject: Application\n\nHello"
+
+
+@pytest.mark.parametrize("status", [503, 429])
+def test_busy_writing_model_falls_back_to_the_light_one(cfg, monkeypatch, status):
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    seen = []
+
+    def handler(request):
+        seen.append(request.url.path.split("/")[-1])
+        if "gemini-3.8-flash" in request.url.path:
+            return httpx.Response(status, json={"error": {"code": status, "message": "high demand"}})
+        return httpx.Response(200, json=ANSWER)
+
+    job = {"title": "QA Analyst", "company": "Uphold", "description": "Testing"}
+    assert message.write(job, gemini_cfg(cfg), client(handler)) == "Subject: Application\n\nHello"
+    assert seen == ["gemini-3.8-flash:generateContent", "gemini-3.5-flash-lite:generateContent"]
+
+
+def test_other_errors_are_not_retried(cfg, monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    seen = []
+
+    def handler(request):
+        seen.append(request.url.path)
+        return httpx.Response(403, json={"error": {"code": 403, "message": "API key not valid"}})
+
+    job = {"title": "QA Analyst", "company": "Uphold", "description": "Testing"}
+    with pytest.raises(gemini.GeminiError, match="recusada"):
+        message.write(job, gemini_cfg(cfg), client(handler))
+    assert len(seen) == 1  # a refused key is refused by every model
