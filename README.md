@@ -10,32 +10,31 @@ A local app that finds jobs in your area of Portugal across job boards and compa
 
 Out of the box ([`config.example.yaml`](config.example.yaml)) it reads these job boards and companies. Each one has been checked against its real site; add any other company on the same platforms in a few lines (see [Find the companies in your area](#find-the-companies-in-your-area)).
 
-| Job boards | Covers | How |
-|---|---|---|
-| **ITJobs.pt** | All of Portugal, IT | Official API (free key) |
-| **Landing.jobs** | All of Portugal, tech | Official feed |
-| **Net-Empregos** | All of Portugal (IT categories) | Official RSS feed |
-| **Randstad** (incl. Randstad Digital) | All of Portugal | Official RSS feed |
-| **Sysmatch** | All of Portugal, IT | Its jobs page |
+| Job boards | How |
+|---|---|
+| **ITJobs.pt** | Official API (free key) |
+| **Landing.jobs** | Official feed |
+| **Net-Empregos** | Official RSS feed |
+| **Randstad** (incl. Randstad Digital) | Official RSS feed |
+| **Sysmatch** | Its jobs page |
 
-| Company | Where its jobs have been | Platform |
-|---|---|---|
-| **Bosch** | Braga, Aveiro, Ovar, Lisbon | SmartRecruiters |
-| **Continental** | Lousado (Famalicão) | SmartRecruiters |
-| **Farfetch** | Porto, Lisbon, Braga, Guimarães | Lever |
-| **Accenture** | Lisbon, Porto, Braga and more | Workday |
-| **Aptiv** | Braga | Workday |
-| **Deloitte** | Lisbon, Porto, Braga and more | SAP SuccessFactors |
-| **EY** | Lisbon, Porto, Braga | SAP SuccessFactors (sitemap) |
-| **Fujitsu** | Lisbon, Braga | SAP SuccessFactors (sitemap) |
-| **Uphold** | Braga | BambooHR |
-| **Mercedes-Benz.io** | Lisbon, Braga (hybrid) | Recruitee |
-| **Edigma** | Braga, Lisbon | Zoho Recruit |
-| **Eurotux** | Braga | Its jobs page |
-| **Balanças Marques** and **SDILAB** (same group) | Braga | Their jobs page |
-| **Nutrium** | Braga | Teamtailor |
-| **Coverflex** | Braga, Milan, Munich | Teamtailor |
-| **Euronext** (not in the example: no jobs in Braga) | Porto, Lisbon | Workday |
+| Company | Platform |
+|---|---|
+| **Bosch** | SmartRecruiters |
+| **Continental** | SmartRecruiters |
+| **Farfetch** | Lever |
+| **Accenture** | Workday |
+| **Aptiv** | Workday |
+| **Deloitte** | SAP SuccessFactors |
+| **EY** | SAP SuccessFactors (sitemap) |
+| **Fujitsu** | SAP SuccessFactors (sitemap) |
+| **Uphold** | BambooHR |
+| **Mercedes-Benz.io** | Recruitee |
+| **Edigma** | Zoho Recruit |
+| **Eurotux** | Its jobs page |
+| **Balanças Marques** and **SDILAB** (same group) | Their jobs page |
+| **Nutrium** | Teamtailor |
+| **Coverflex** | Teamtailor |
 
 When the same job shows up on two of them (a company's own page and ITJobs, say), it's one card with a link to each.
 
