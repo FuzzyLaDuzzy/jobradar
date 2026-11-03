@@ -14,7 +14,7 @@ STATUSES = ("nova", "guardada", "candidatei", "descartada")
 
 
 # job boards and agencies that repost companies' jobs: the company's own posting is the one kept
-AGGREGATORS = {"itjobs", "landingjobs", "netempregos", "randstad", "sysmatch", "workable", "workinbraga"}
+AGGREGATORS = {"itjobs", "landingjobs", "netempregos", "randstad", "sysmatch", "workable", "workinbraga", "smartrecruiters_search"}
 
 
 _GENDER_RE = re.compile(r"\((?:[mfhxd]\s*/\s*)+[a-z]+\.?\)")  # (m/f), (f/m/x), (f/m/div.), (h/m)
@@ -92,6 +92,18 @@ CREATE TABLE IF NOT EXISTS jobs (
     last_seen TEXT,
     active INTEGER DEFAULT 1,
     matches INTEGER DEFAULT 1
+);
+-- the jobs the filters cut in the last search of each source, with the reason (the ✂ tab)
+CREATE TABLE IF NOT EXISTS cut (
+    uid TEXT PRIMARY KEY,
+    source TEXT,
+    company TEXT,
+    title TEXT,
+    location TEXT,
+    url TEXT,
+    posted_at TEXT,
+    reason TEXT,
+    seen TEXT
 );
 CREATE TABLE IF NOT EXISTS runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -270,6 +282,30 @@ class Database:
         key = duplicate_key(job) if job else None
         return [j["uid"] for j in self._listed()
                 if key and j["source"] != job["source"] and duplicate_key(j) == key]
+
+    def acted_on(self) -> list[dict]:
+        """The jobs you did something with: applied, saved, discarded, or wrote notes about (the CSV export)."""
+        rows = self.conn.execute(
+            "SELECT * FROM jobs WHERE status != 'nova' OR notes != '' "
+            "ORDER BY applied_at IS NULL, applied_at DESC, status, score DESC"
+        ).fetchall()
+        return [_row_to_dict(r) for r in rows]
+
+    # --- cut by the filters -------------------------------------------------
+    def replace_cut(self, source: str, cut: list[tuple[Job, str]], now: str) -> None:
+        """What one source's search cut, and why: replaces that source's earlier list."""
+        with self._lock:
+            self.conn.execute("DELETE FROM cut WHERE source = ?", (source,))
+            self.conn.executemany(
+                "INSERT OR REPLACE INTO cut (uid, source, company, title, location, url, posted_at, reason, seen) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                [(job.uid, source, job.company, job.title, job.location, web_link(job.url), job.posted_at, reason, now)
+                 for job, reason in cut])
+            self.conn.commit()
+
+    def cut_jobs(self) -> list[dict]:
+        rows = self.conn.execute("SELECT * FROM cut ORDER BY reason LIKE 'fora da área%', title").fetchall()
+        return [dict(r) for r in rows]
 
     # --- runs -------------------------------------------------------------
     def add_run(self, **run) -> None:

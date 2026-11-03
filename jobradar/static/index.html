@@ -73,7 +73,13 @@
       <input type="range" min="0" max="90" step="5" v-model.number="minScore">
       <b>{{ minScore }}</b>
     </label>
+    <label class="range">
+      {{ t('Salário ≥') }}
+      <input type="number" class="money" min="0" step="100" v-model.number="minSalary" :placeholder="t('€/mês')"
+             :aria-label="t('Salário mínimo por mês')">
+    </label>
     <label class="check"><input type="checkbox" v-model="showInactive"> {{ t('Mostrar indisponíveis') }}</label>
+    <a class="btn ghost" href="/api/export.csv" :title="t('As tuas candidaturas, guardadas, descartadas e notas, numa folha para o Excel')">{{ t('⬇ Exportar CSV') }}</a>
   </section>
 
   <main>
@@ -83,6 +89,25 @@
       <h2>{{ t('Ainda não há vagas') }}</h2>
       <p>{{ t('Carrega em') }} <b>{{ t('Procurar vagas') }}</b> {{ t('para ler todas as fontes configuradas.') }}</p>
     </div>
+    <section v-else-if="tab === 'cortadas'" class="cut">
+      <p class="muted small">{{ t('O que a última procura leu e os filtros cortaram, com o motivo. Se uma vaga te interessar, guarda-a.') }}</p>
+      <select v-model="cutReason" :aria-label="t('Motivo')">
+        <option value="">{{ t('Todos os motivos') }} ({{ cut.length }})</option>
+        <option v-for="r in cutReasons" :key="r.name" :value="r.name">{{ r.name }} ({{ r.count }})</option>
+      </select>
+      <p class="muted" v-if="!cutFiltered.length">{{ t('Nenhuma vaga cortada com estes filtros.') }}</p>
+      <div v-for="c in cutShown" :key="c.uid" class="cut-row">
+        <div class="cut-main">
+          <a :href="c.url" target="_blank" rel="noopener" class="title">{{ c.title }}</a>
+          <div class="meta">{{ c.company }} · {{ c.location || t('Localização por confirmar') }} · {{ sourceName(c.source) }}</div>
+        </div>
+        <span class="badge warn">{{ c.reason }}</span>
+        <button class="btn ghost" @click="keepCut(c)" :disabled="c.kept">{{ c.kept ? t('Guardada ✓') : t('＋ Guardar') }}</button>
+      </div>
+      <button class="btn" v-if="cutFiltered.length > cutLimit" @click="cutLimit += 100">
+        {{ t('Mostrar mais ({n})', { n: cutFiltered.length - cutLimit }) }}
+      </button>
+    </section>
     <div v-else-if="!loading && filtered.length === 0" class="empty">
       <h2>{{ t('Nenhuma vaga com estes filtros') }}</h2>
       <p>{{ t('Experimenta baixar o encaixe mínimo ou mudar de separador.') }}</p>
@@ -113,6 +138,7 @@
           <span class="badge" v-if="j.contract">{{ j.contract }}</span>
           <span class="badge" v-if="j.experience && j.experience.toLowerCase() !== (j.contract || '').toLowerCase()">{{ j.experience }}</span>
           <span class="badge" v-if="j.work_model">{{ workModel(j.work_model) }}</span>
+          <span class="badge pay" v-if="j.salary" :title="t('Salário indicado no anúncio')">💶 {{ j.salary.text }}</span>
           <span class="badge applied" v-if="j.applied_at">{{ t('Candidatei-me a {date}', { date: shortDate(j.applied_at) }) }}</span>
           <span class="badge warn" v-if="j.flags.years_required >= 2">{{ t('Pede {n}+ anos', { n: j.flags.years_required }) }}</span>
           <span class="badge warn" v-if="!j.active">{{ t('Já não está publicada') }}</span>
@@ -139,12 +165,16 @@
                 <span v-if="j.interviewBusy" class="spinner"></span>
                 {{ j.interviewBusy ? t('A preparar…') : (j.interview ? t('↻ Preparar de novo') : t('🎯 Preparar entrevista')) }}
               </button>
+              <button class="btn" @click="generate(j, 'cv')" :disabled="j.cvBusy">
+                <span v-if="j.cvBusy" class="spinner"></span>
+                {{ j.cvBusy ? t('A analisar…') : (j.cv ? t('↻ Analisar de novo') : t('🧩 Ajustar o CV')) }}
+              </button>
             </div>
-            <template v-for="kind in ['message', 'interview']" :key="kind">
+            <template v-for="kind in ['message', 'interview', 'cv']" :key="kind">
               <p class="alert" v-if="j[kind + 'Error']">{{ j[kind + 'Error'] }}</p>
               <template v-if="j[kind]">
                 <textarea class="ai-text" v-model="j[kind]"
-                          :aria-label="kind === 'message' ? t('Rascunho da mensagem') : t('Preparação da entrevista')"></textarea>
+                          :aria-label="kind === 'message' ? t('Rascunho da mensagem') : kind === 'cv' ? t('Ajustes ao CV') : t('Preparação da entrevista')"></textarea>
                 <button class="btn" @click="copyText(j[kind])">{{ t('Copiar') }}</button>
                 <button class="btn" v-if="kind === 'message'" :disabled="j.messageBusy"
                         @click="generate(j, 'message', otherLanguage(j.message))">
@@ -302,9 +332,17 @@
         <button type="button" class="btn icon" @click="addOpen = false" :aria-label="t('Fechar')">✕</button>
       </header>
       <p class="muted small">{{ t('Para vagas que encontraste noutro sítio (LinkedIn, um amigo…). Fica nas Guardadas e acompanhas como as outras.') }}</p>
+      <label>{{ t('Link da vaga') }}
+        <span class="link-row">
+          <input ref="newUrl" v-model="newJob.url" type="url" maxlength="2000" placeholder="https://…">
+          <button type="button" class="btn" @click="readLink" :disabled="!newJob.url || readingLink">
+            <span v-if="readingLink" class="spinner"></span>{{ readingLink ? t('A ler…') : t('Ler do link') }}
+          </button>
+        </span>
+      </label>
+      <p class="muted small" v-if="newJob.description">{{ t('Descrição lida do link ({n} caracteres).', { n: newJob.description.length }) }}</p>
       <label>{{ t('Título *') }}<input ref="newTitle" v-model="newJob.title" required maxlength="200" :placeholder="t('ex.: Junior Backend Developer')"></label>
       <label>{{ t('Empresa') }}<input v-model="newJob.company" maxlength="200"></label>
-      <label>{{ t('Link da vaga') }}<input v-model="newJob.url" type="url" maxlength="2000" placeholder="https://www.linkedin.com/jobs/view/…"></label>
       <label>{{ t('Localização') }}<input v-model="newJob.location" maxlength="200" :placeholder="t('ex.: Lisboa (híbrido)')"></label>
       <label>{{ t('Notas') }}<textarea v-model="newJob.notes" maxlength="5000"></textarea></label>
       <p class="alert" v-if="addError">{{ addError }}</p>

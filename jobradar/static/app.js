@@ -4,9 +4,10 @@ const STORAGE_KEY = "jobradar.filters";
 const SOURCE_NAMES = {
   itjobs: "ITJobs", sysmatch: "Sysmatch", landingjobs: "Landing.jobs", netempregos: "Net-Empregos", randstad: "Randstad",
   manual: "Adicionada por ti", balancasmarques: "Balanças Marques", workable: "Workable", workinbraga: "Work in Braga",
+  smartrecruiters_search: "SmartRecruiters",
 };
 const WORK_MODELS = { remote: "Remoto", hybrid: "Híbrido", "on-site": "Presencial", onsite: "Presencial" };
-const EMPTY_JOB = () => ({ title: "", company: "", url: "", location: "", notes: "" });
+const EMPTY_JOB = () => ({ title: "", company: "", url: "", location: "", notes: "", description: "", posted_at: "" });
 const WELCOME_KEY = "jobradar.welcomed";
 const THEME_KEY = "jobradar.theme"; // "light" or "dark"; none = follow the system (style.css)
 
@@ -93,6 +94,29 @@ const EN = {
   "A escrever…": "Writing…",
   "↻ Outra versão da mensagem": "↻ Another version of the message",
   "Licença MIT": "MIT License",
+  "🧩 Ajustar o CV": "🧩 Tailor my CV",
+  "✂ Cortadas": "✂ Cut",
+  "Salário indicado no anúncio": "Salary stated in the posting",
+  "Salário ≥": "Salary ≥",
+  "€/mês": "€/month",
+  "Salário mínimo por mês": "Minimum salary per month",
+  "As tuas candidaturas, guardadas, descartadas e notas, numa folha para o Excel":
+    "Your applications, saved and discarded jobs and notes, in a sheet for Excel",
+  "⬇ Exportar CSV": "⬇ Export CSV",
+  "O que a última procura leu e os filtros cortaram, com o motivo. Se uma vaga te interessar, guarda-a.":
+    "What the last search read and the filters cut, with the reason. If a job interests you, save it.",
+  "Motivo": "Reason",
+  "Todos os motivos": "All reasons",
+  "Nenhuma vaga cortada com estes filtros.": "No cut jobs with these filters.",
+  "Guardada ✓": "Saved ✓",
+  "＋ Guardar": "＋ Save",
+  "Mostrar mais ({n})": "Show more ({n})",
+  "A ler…": "Reading…",
+  "Ler do link": "Read from link",
+  "Descrição lida do link ({n} caracteres).": "Description read from the link ({n} characters).",
+  "↻ Analisar de novo": "↻ Analyse again",
+  "A analisar…": "Analysing…",
+  "Ajustes ao CV": "CV tailoring",
   "Reescrever em inglês": "Rewrite in English",
   "Reescrever em português": "Rewrite in Portuguese",
   "✉ Gerar mensagem de candidatura": "✉ Write application message",
@@ -340,6 +364,9 @@ createApp({
       systemDark: window.matchMedia("(prefers-color-scheme: dark)").matches,
       jobs: [],
       runs: [],
+      cut: [], // ✂ what the filters cut in the last search, and why
+      cutReason: "",
+      cutLimit: 100,
       loading: true,
       refreshing: false,
       error: "",
@@ -349,6 +376,7 @@ createApp({
       minScore: saved.minScore ?? 0,
       sort: saved.sort || "score",
       showInactive: saved.showInactive || false,
+      minSalary: saved.minSalary || 0,
       settingsOpen: false,
       configText: "",
       configError: "",
@@ -358,6 +386,7 @@ createApp({
       newJob: EMPTY_JOB(),
       addError: "",
       adding: false,
+      readingLink: false,
       keyGuides: KEY_GUIDES,
       keyStatus: {},
       keysOpen: false,
@@ -393,13 +422,14 @@ createApp({
         { key: "guardada", label: this.t("Guardadas") },
         { key: "candidatei", label: this.t("Candidaturas") },
         { key: "descartada", label: this.t("Descartadas") },
+        { key: "cortadas", label: this.t("✂ Cortadas") },
       ];
     },
     visible() {
       return this.jobs.filter((j) => this.showInactive || j.active || j.status === "candidatei");
     },
     counts() {
-      const c = { todas: 0, nova: 0, guardada: 0, candidatei: 0, descartada: 0 };
+      const c = { todas: 0, nova: 0, guardada: 0, candidatei: 0, descartada: 0, cortadas: this.cut.length };
       for (const j of this.visible) {
         c[j.status] = (c[j.status] || 0) + 1;
         if (j.status !== "descartada") c.todas++;
@@ -414,11 +444,13 @@ createApp({
       return times.length ? times[times.length - 1] : null;
     },
     filtered() {
+      if (this.tab === "cortadas") return [];
       const q = this.normalize(this.query);
       let list = this.visible.filter((j) => {
         if (this.tab === "todas" ? j.status === "descartada" : j.status !== this.tab) return false;
         if (this.source && j.source !== this.source) return false;
         if (j.score < this.minScore) return false;
+        if (this.minSalary && !(j.salary && j.salary.max >= this.minSalary)) return false;
         if (q) {
           const hay = this.normalize([j.title, j.company, j.location, j.description, j.contract].join(" "));
           if (!q.split(/\s+/).every((w) => hay.includes(w))) return false;
@@ -429,10 +461,31 @@ createApp({
       list.sort(this.sort === "date" ? byDate : (a, b) => b.score - a.score || byDate(a, b));
       return list;
     },
+    cutReasons() {
+      const counts = {};
+      for (const c of this.cut) counts[c.category] = (counts[c.category] || 0) + 1;
+      return Object.entries(counts).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
+    },
+    cutFiltered() {
+      const q = this.normalize(this.query);
+      return this.cut.filter((c) => {
+        if (this.cutReason && c.category !== this.cutReason) return false;
+        if (this.source && c.source !== this.source) return false;
+        const hay = this.normalize([c.title, c.company, c.location].join(" "));
+        return !q || q.split(/\s+/).every((w) => hay.includes(w));
+      });
+    },
+    cutShown() {
+      return this.cutFiltered.slice(0, this.cutLimit);
+    },
   },
 
   watch: {
     tab: "persist", query: "persist", source: "persist", minScore: "persist", sort: "persist", showInactive: "persist",
+    minSalary: "persist",
+    cutReason() {
+      this.cutLimit = 100;
+    },
   },
 
   methods: {
@@ -442,9 +495,9 @@ createApp({
     },
 
     persist() {
-      const { tab, query, source, minScore, sort, showInactive } = this;
+      const { tab, query, source, minScore, sort, showInactive, minSalary } = this;
       try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ tab, query, source, minScore, sort, showInactive }));
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ tab, query, source, minScore, sort, showInactive, minSalary }));
       } catch {
         /* storage unavailable: filters just won't be remembered */
       }
@@ -500,7 +553,7 @@ createApp({
 
     async load() {
       try {
-        [this.jobs, this.runs] = await Promise.all([this.api("/api/jobs"), this.api("/api/runs")]);
+        [this.jobs, this.runs, this.cut] = await Promise.all([this.api("/api/jobs"), this.api("/api/runs"), this.api("/api/cut")]);
         this.error = "";
       } catch (e) {
         this.error = this.t("Não foi possível carregar as vagas: {error}", { error: e.message });
@@ -590,7 +643,35 @@ createApp({
       this.newJob = EMPTY_JOB();
       this.addError = "";
       this.addOpen = true;
-      this.$nextTick(() => this.$refs.newTitle?.focus());
+      this.$nextTick(() => this.$refs.newUrl?.focus());
+    },
+
+    // "+ Add job": the posting at the link fills in the form; you check it, then add it
+    async readLink() {
+      this.readingLink = true;
+      this.addError = "";
+      try {
+        const job = await this.api("/api/jobs/from-url", { method: "POST", body: JSON.stringify({ url: this.newJob.url }) });
+        Object.assign(this.newJob, job);
+      } catch (e) {
+        this.addError = e.message;
+      } finally {
+        this.readingLink = false;
+      }
+    },
+
+    // ✂ tab: a job the filters cut, saved by hand; it joins Saved like any job added there
+    async keepCut(c) {
+      const job = { title: c.title.slice(0, 200), company: (c.company || "").slice(0, 200), url: c.url || "",
+                    location: (c.location || "").slice(0, 200) };
+      try {
+        await this.api("/api/jobs", { method: "POST", body: JSON.stringify(job) });
+        c.kept = true;
+        this.jobs = await this.api("/api/jobs");
+        this.showToast(this.t("Vaga adicionada às Guardadas"));
+      } catch (e) {
+        this.showToast(this.t("Não foi possível adicionar: {error}", { error: e.message }));
+      }
     },
 
     async addJob() {

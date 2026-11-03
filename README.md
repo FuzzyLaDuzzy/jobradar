@@ -18,6 +18,7 @@ Out of the box ([`config.example.yaml`](config.example.yaml)) it reads these job
 | **Randstad** (incl. Randstad Digital) | Official RSS feed |
 | **Sysmatch** | Its jobs page |
 | **Workable** (every company on Workable, searched in your area) | Public job search |
+| **SmartRecruiters** (every company on SmartRecruiters, searched in your area) | Public job search |
 | **Work in Braga** (InvestBraga's job board, where companies post themselves) | Its jobs page |
 
 | Company | Platform |
@@ -37,6 +38,7 @@ Out of the box ([`config.example.yaml`](config.example.yaml)) it reads these job
 | **Balanças Marques** and **SDILAB** (same group) | Their jobs page |
 | **Nutrium** | Teamtailor |
 | **Coverflex** | Teamtailor |
+| **Bloq.it** | Teamtailor |
 | **Devoteam** | SmartRecruiters |
 | **Jscrambler** | SmartRecruiters |
 | **Ubiwhere** | SmartRecruiters |
@@ -61,16 +63,21 @@ LinkedIn, Indeed and Glassdoor are left out on purpose (see [Limitations](#limit
   - **ITJobs.pt**, the main Portuguese IT job board (free read-only key)
   - **Landing.jobs**, **Net-Empregos** and **Randstad**, through their official feeds
   - **Sysmatch**, **Work in Braga**, **Eurotux** and **Balanças Marques** (with SDILAB), from their jobs pages
-  - **Workable**'s public job search, in your area: every company that hires through Workable, even the ones you've never heard of
+  - **Workable**'s and **SmartRecruiters**' public job searches, in your area: every company that hires through them, even the ones you've never heard of
   - **Company careers sites** on SmartRecruiters, Lever, Workday, SAP SuccessFactors, BambooHR, Recruitee, Zoho Recruit, Teamtailor and Greenhouse, from companies all over Portugal (Bosch, Farfetch, Accenture, Deloitte, Devoteam, Feedzai, Sword Health, Cloudflare, Celfocus… or any company you add); each keeps only the jobs in your area
 - **Filters** by your area, the kind of job (words the title must have), your level (junior words, senior words to skip), excluded words and companies, job age and typical scam signs. When a source doesn't say where the job is, it looks for the city in the description; when the title names a city outside your area ("Lisbon Based", "Relocate to…"), the title wins.
 - **Scores each job from 0 to 100** from keywords (level, area, your skills and interests), with a penalty for jobs that ask for 3+ years. With an AI key, an LLM also scores each new job against your profile and writes one sentence on why.
 - **Your profile from your CV** (👤): drop your CV (PDF) and the AI fills in your name, contacts, skills, education, projects, experience and the jobs you're after; check and fix anything before saving, or fill it in by hand. Everything lands in `config.yaml`, which the score, the messages and the interview prep use.
 - **Writes a draft application message** (✉) in the posting's language, using only the facts in your profile, and honest about what you're missing.
 - **Prepares you for the interview** (🎯): what the job is looking for, likely technical and behavioural questions with hints from your profile, your gaps against the posting, and questions to ask the company.
+- **Tailors your CV to each job** (🧩): which of your skills and projects to put first for that job, what it asks for that your profile doesn't show, and words from the posting worth using.
 - **Follows a company in one click** (＋): on a job from a job board, **＋ Follow company** looks for that company's careers site on ten platforms and, if JobRadar can read it, adds it to your sources, so its jobs come straight from the company with the full description.
 - **Shows what the jobs ask for** (📊 Market): the skills most asked for in the jobs it found, and which ones your profile already has, so you know what to learn next.
+- **Shows the salary** (💶) when the posting states one, and filters by it (per month; a yearly amount counts over 14 payments).
+- **Shows what the filters cut** (✂ Cut): every job the last search read and left out, with the reason, so a good job cut by mistake can still be saved.
 - **Tracks your applications**: mark jobs as saved, applied (with the date) or discarded, and keep notes apart from the description. Jobs you find elsewhere (LinkedIn, a friend…) can be added by hand.
+- **Adds a job from its link**: paste it in **+ Add job** and **Read from link** fills in the title, company, place, date and description (not LinkedIn, Indeed or Glassdoor).
+- **Exports to CSV** (⬇): your applications, saved and discarded jobs and notes, in a sheet for Excel.
 - **Spots jobs that closed**: when a job disappears from its source, it's marked as no longer published.
 - **Português or English**: the PT/EN button changes the whole app, the error messages and what the AI writes for you.
 - **Light or dark**: the ☀/☾ button (until you choose, it follows your system).

@@ -85,6 +85,8 @@ sources:
     - company: Sysmatch
   workable:                   # jobs.workable.com: every company on Workable with jobs in your area (from `search`)
     - {}
+  smartrecruiters_search:     # SmartRecruiters' public job search, by your area: every company on it, except the ones
+    - {}                      # followed below under smartrecruiters (only the 100 newest jobs per place)
   # Companies' own careers sites
   eurotux:                    # eurotux.com/careers (Braga)
     - company: Eurotux
@@ -112,6 +114,9 @@ sources:
     - company: coverflex
       name: Coverflex
       logo: https://www.google.com/s2/favicons?domain=coverflex.com&sz=128
+    - company: bloqit
+      name: Bloq.it
+      logo: https://www.google.com/s2/favicons?domain=bloq.it&sz=128
     - company: infraspeak
       name: Infraspeak
       logo: https://www.google.com/s2/favicons?domain=infraspeak.com&sz=128

@@ -52,6 +52,24 @@ INTERVIEW_LANGUAGES = {
 }
 
 
+CV_SYSTEM = """Ajudas um candidato a adaptar o CV a uma vaga, a partir do perfil dele e do anúncio.
+
+Escreve em {language}, em texto simples (títulos em maiúsculas e listas com "- ", sem markdown), com estas secções, com os títulos exatamente assim:
+1. {s1}: as competências e experiências do perfil que esta vaga mais valoriza, por ordem de importância, cada uma com uma linha sobre porquê.
+2. {s2}: os projetos do perfil a pôr primeiro e o que dizer de cada um para esta vaga.
+3. {s3}: o que o anúncio pede e o perfil não mostra, a dizer se é obrigatório ou só valorizado.
+4. {s4}: palavras do anúncio que convém usar no CV, só as que forem verdade para o candidato.
+
+Usa só factos do perfil; nunca inventes experiência, tecnologias, projetos nem níveis. No máximo 5 pontos por secção.
+
+""" + DATA_RULE
+# the language the CV notes are written in, and their section titles
+CV_LANGUAGES = {
+    "pt": ("português europeu", "O QUE DESTACAR", "PROJETOS A PÔR PRIMEIRO", "O QUE FALTA", "PALAVRAS DO ANÚNCIO"),
+    "en": ("inglês", "WHAT TO HIGHLIGHT", "PROJECTS TO PUT FIRST", "WHAT'S MISSING", "WORDS FROM THE POSTING"),
+}
+
+
 class MessageError(RuntimeError):
     """The model declined or answered with no text."""
 
@@ -150,4 +168,12 @@ def interview(job: dict, cfg: dict, client=None) -> str:
     prompt = _prompt(job, cfg.get("profile") or {}, "Prepara-me para a entrevista desta vaga.")
     language, *sections = INTERVIEW_LANGUAGES[i18n.language]
     system = INTERVIEW_SYSTEM.format(language=language, **{f"s{i}": s for i, s in enumerate(sections, 1)})
+    return _generate(system, prompt, cfg, client)
+
+
+def tailor(job: dict, cfg: dict, client=None) -> str:
+    """What to highlight in the CV for this job, and what it lacks: in the app's language, like the interview notes."""
+    prompt = _prompt(job, cfg.get("profile") or {}, "Diz-me como adaptar o meu CV a esta vaga.")
+    language, *sections = CV_LANGUAGES[i18n.language]
+    system = CV_SYSTEM.format(language=language, **{f"s{i}": s for i, s in enumerate(sections, 1)})
     return _generate(system, prompt, cfg, client)

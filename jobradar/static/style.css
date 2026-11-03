@@ -131,6 +131,26 @@ body {
 .range, .check { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--muted); }
 .range input { accent-color: var(--accent); width: 110px; }
 .range b { color: var(--text); min-width: 18px; }
+.range input.money {
+  width: 86px; font: inherit; font-size: 14px; color: var(--text); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 10px; padding: 7px 9px;
+}
+
+/* ✂ the jobs the filters cut, with the reason */
+.cut select {
+  font: inherit; font-size: 14px; color: var(--text); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 10px; padding: 8px 11px; margin: 4px 0 12px;
+}
+.cut-row {
+  display: flex; align-items: center; gap: 12px; padding: 10px 14px; margin-bottom: 8px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+}
+.cut-main { flex: 1; min-width: 0; }
+.cut-main .title { font-weight: 600; color: var(--text); text-decoration: none; }
+.cut-main .title:hover { color: var(--accent); }
+.cut-main .meta { font-size: 13px; color: var(--muted); }
+.link-row { display: flex; gap: 6px; }
+.link-row input { flex: 1; min-width: 0; }
 .check input { accent-color: var(--accent); }
 
 /* cards */
@@ -172,6 +192,7 @@ a.badge.source:hover { color: var(--accent); border-color: var(--accent); }
 .badge.new { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
 .badge.warn { background: var(--warn-bg); color: var(--warn); }
 .badge.applied { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.badge.pay { background: var(--accent-soft); color: var(--high); font-weight: 600; }
 
 .reason { margin: 9px 0 0; font-size: 13.5px; }
 details { margin-top: 8px; }

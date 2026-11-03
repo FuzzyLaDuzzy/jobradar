@@ -47,7 +47,7 @@ def run_refresh(
                 started = _now()
                 summary = dict(source=label, started_at=started, fetched=0, kept=0, new=0)
                 try:
-                    jobs = fetch(client, with_area(kind, entry, search), prefilter=prefilter)
+                    jobs = fetch(client, with_area(kind, entry, search, cfg.get("sources")), prefilter=prefilter)
                 except SourceSkipped as exc:
                     summary.update(status="skipped", message=str(exc))
                 except (RuntimeError, httpx.HTTPError) as exc:  # API said no, network down
@@ -62,9 +62,11 @@ def run_refresh(
                         job.logo = job.logo or entry.get("logo", "")
                     summary["fetched"] = len(jobs)
                     kept: set[str] = set()
+                    cut: list[tuple[Job, str]] = []  # shown in the ✂ tab, to catch good jobs cut by mistake
                     for job in jobs:
-                        keep, _reason, flags = evaluate(job, search)
+                        keep, reason, flags = evaluate(job, search)
                         if not keep:
+                            cut.append((job, reason or ""))
                             continue
                         kw, reasons = scoring.keyword_score(job, cfg, flags)
                         kept.add(job.uid)
@@ -74,6 +76,7 @@ def run_refresh(
                     fetched = {j.uid for j in jobs}
                     db.mark_gone(label, fetched)
                     db.mark_unmatched(label, fetched, kept)
+                    db.replace_cut(label, cut, now)
                     summary.update(status="ok", message="")
                 summary["finished_at"] = _now()
                 db.add_run(**summary)

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import base64
+import csv
 import hashlib
+import io
 import os
 import re
 import threading
@@ -12,15 +14,16 @@ from typing import Literal
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from . import config as config_mod
-from . import discover, gemini, i18n, message, profile, scoring, skills
+from . import discover, gemini, i18n, link, message, profile, salary, scoring, skills
 from .i18n import t
 from .db import STATUSES, Database
+from .filters import reason_label
 from .models import Job
 from .refresh import run_refresh
 from .sources import make_client
@@ -44,6 +47,9 @@ class NewJob(BaseModel):
     url: str = Field("", max_length=2000)
     location: str = Field("", max_length=200)
     notes: str = Field("", max_length=5000)
+    # filled in by "Read from the link"
+    description: str = Field("", max_length=20000)
+    posted_at: str = Field("", pattern=r"^(\d{4}-\d{2}-\d{2})?$")
 
     @field_validator("title", "company", "url", "location", mode="before")
     @classmethod
@@ -57,6 +63,28 @@ class NewJob(BaseModel):
         if value and not value.lower().startswith(("http://", "https://")):
             raise ValueError(t("o link tem de começar por http:// ou https://"))
         return value
+
+
+class LinkBody(BaseModel):
+    url: str = Field(min_length=1, max_length=2000)
+
+    @field_validator("url")
+    @classmethod
+    def _http_only(cls, value: str) -> str:
+        value = value.strip()
+        if not value.lower().startswith(("http://", "https://")):
+            raise ValueError(t("o link tem de começar por http:// ou https://"))
+        return value
+
+
+def _salary(job: dict) -> dict | None:
+    return salary.find(" ".join([job.get("title") or "", job.get("contract") or "", job.get("description") or ""]))
+
+
+def _cell(value) -> str:
+    """A spreadsheet cell: text that starts like a formula ("=", "+", "@") would run in Excel, so it gets a quote."""
+    text = "" if value is None else str(value)
+    return "'" + text if text[:1] in ("=", "+", "@") or (text[:1] == "-" and text[1:2] not in (" ", "")) else text
 
 
 class ConfigBody(BaseModel):
@@ -167,14 +195,54 @@ def create_app(
 
     @app.get("/api/jobs")
     def list_jobs():
-        return db.all_jobs()
+        jobs = db.all_jobs()
+        for job in jobs:
+            job["salary"] = _salary(job)
+        return jobs
+
+    @app.get("/api/cut")
+    def cut_jobs():
+        """The jobs the filters cut in the last search, and why (the ✂ tab)."""
+        cut = db.cut_jobs()
+        for job in cut:
+            job["category"] = reason_label(job["reason"].partition(" (")[0])
+            job["reason"] = reason_label(job["reason"])
+        return cut
+
+    @app.get("/api/export.csv")
+    def export_csv():
+        """Your applications and the jobs you saved, discarded or wrote notes about, for Excel (";", as in Portugal)."""
+        names = {"nova": t("Nova"), "guardada": t("Guardada"), "candidatei": t("Candidatei"), "descartada": t("Descartada")}
+        out = io.StringIO()
+        writer = csv.writer(out, delimiter=";")
+        writer.writerow([t("Estado"), t("Empresa"), t("Vaga"), t("Localização"), t("Salário"), t("Fonte"), t("Link"),
+                         t("Publicada"), t("Candidatei em"), t("Encaixe"), t("Notas")])
+        for job in db.acted_on():
+            pay = _salary(job)
+            writer.writerow([_cell(v) for v in (
+                names.get(job["status"], job["status"]), job["company"], job["title"], job["location"],
+                pay["text"] if pay else "", job["source"], job["url"], job["posted_at"] or "",
+                (job.get("applied_at") or "")[:10], job["score"], job["notes"])])
+        name = t("jobradar-candidaturas.csv")
+        return Response("\ufeff" + out.getvalue(), media_type="text/csv; charset=utf-8",  # the BOM: Excel reads UTF-8
+                        headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+    @app.post("/api/jobs/from-url")
+    def job_from_url(body: LinkBody):
+        """"+ Add job": reads the posting at a link to fill in the form (nothing is saved here)."""
+        try:
+            with make_client() as client:
+                return link.read(body.url, client)
+        except link.LinkError as exc:
+            raise HTTPException(400, str(exc)) from exc
 
     @app.post("/api/jobs", status_code=201)
     def add_job(body: NewJob):
         # same link, same job: adding it twice updates it instead of duplicating it
         key = body.url or uuid.uuid4().hex
         job = Job(source="manual", external_id=hashlib.sha1(key.encode()).hexdigest()[:12],
-                  company=body.company, title=body.title, location=body.location, url=body.url)
+                  company=body.company, title=body.title, location=body.location, url=body.url,
+                  description=body.description, posted_at=body.posted_at or None)
         try:
             kw, reasons = scoring.keyword_score(job, config_mod.load(config_path))
         except config_mod.ConfigError:
@@ -293,6 +361,10 @@ def create_app(
     @app.post("/api/jobs/{uid:path}/interview")
     def job_interview(uid: str):
         return ai_text(uid, message.interview)
+
+    @app.post("/api/jobs/{uid:path}/cv")
+    def job_cv(uid: str):
+        return ai_text(uid, message.tailor)
 
     @app.patch("/api/jobs/{uid:path}")
     def update_job(uid: str, body: JobUpdate):

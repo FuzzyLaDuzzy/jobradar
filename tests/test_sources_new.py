@@ -8,8 +8,8 @@ import json
 import httpx
 import pytest
 
-from jobradar.sources import (balancasmarques, eurotux, greenhouse, recruitee, teamtailor, with_area, workable, workinbraga,
-                              zohorecruit)
+from jobradar.sources import (balancasmarques, eurotux, greenhouse, recruitee, smartrecruiters, teamtailor, with_area, workable,
+                              workinbraga, zohorecruit)
 
 # --- Recruitee ---------------------------------------------------------------
 
@@ -322,3 +322,43 @@ def test_greenhouse_board(make_client):
     assert (engineer.posted_at, engineer.work_model) == ("2026-10-09", "hybrid")
     assert engineer.description == "At Sword, we’re building AI Care.\nPython"  # escaped HTML, read as HTML
     assert (analyst.posted_at, analyst.work_model) == ("2026-10-20", "remote")  # no first_published: updated_at
+
+
+# --- SmartRecruiters search (by place) ----------------------------------------
+
+def _sr_hit(search_id, posting_id, company, name, city):
+    return {"id": search_id, "name": name, "releasedDate": "2026-11-03T11:52:54.902Z",
+            "company": {"identifier": company, "name": company},
+            "location": {"city": city, "region": "Braga", "country": "pt", "remote": False, "hybrid": True},
+            "typeOfEmployment": {}, "experienceLevel": {},
+            "actions": {"details": f"https://api.smartrecruiters.com/v1/companies/{company}/postings/{posting_id}"}}
+
+
+SR_SEARCH = {"offset": 0, "limit": 100, "totalFound": 3, "content": [
+    _sr_hit("744000159365001", "13693764001", "BoschGroup", "Junior Software Engineer", "Braga"),  # followed already
+    _sr_hit("744000159365002", "13693764002", "Inetum", "Junior Java Developer", "Braga"),
+    _sr_hit("744000159365003", "13693764003", "Eurofins", "Laboratory Technician", "Braga")]}
+SR_DETAIL = {"id": "13693764002", "postingUrl": "https://jobs.smartrecruiters.com/Inetum/744000159365002-junior-java-developer",
+             "typeOfEmployment": {"label": "Full-time"}, "experienceLevel": {"label": "Entry Level"},
+             "jobAd": {"sections": {"jobDescription": {"text": "<p>Java and Spring.</p>"}}}}
+
+
+def test_smartrecruiters_search_by_place(make_client):
+    seen = []
+
+    def handler(request):
+        seen.append(str(request.url))
+        return httpx.Response(200, json=SR_SEARCH if "sr-jobs/search" in request.url.path else SR_DETAIL)
+
+    entry = with_area("smartrecruiters_search", {}, {"locations_primary": ["braga"], "locations": ["braga"]},
+                      {"smartrecruiters": [{"company": "BoschGroup", "country": "pt"}]})
+    jobs = smartrecruiters.search(make_client(handler), entry, prefilter=lambda job: "Java" in job.title)
+    assert [j.company for j in jobs] == ["Inetum", "Eurofins"]  # Bosch is left to its own entry
+    assert seen == ["https://jobs.smartrecruiters.com/sr-jobs/search?keyword=braga&limit=100",
+                    "https://api.smartrecruiters.com/v1/companies/Inetum/postings/13693764002"]  # no detail for the lab
+    java = jobs[0]
+    assert java.uid == "smartrecruiters_search:13693764002"  # the posting's id, from the detail link
+    assert (java.location, java.work_model) == ("Braga, Braga, PT", "hybrid")
+    assert (java.contract, java.experience) == ("Full-time", "Entry Level")  # empty in the search, from the detail
+    assert java.description == "Java and Spring."
+    assert java.url == "https://jobs.smartrecruiters.com/Inetum/744000159365002-junior-java-developer"

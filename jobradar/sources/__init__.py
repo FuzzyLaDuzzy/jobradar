@@ -6,6 +6,7 @@ from .base import SourceSkipped, make_client
 
 FETCHERS = {
     "smartrecruiters": smartrecruiters.fetch,
+    "smartrecruiters_search": smartrecruiters.search,
     "lever": lever.fetch,
     "workday": workday.fetch,
     "successfactors": successfactors.fetch,
@@ -28,6 +29,7 @@ FETCHERS = {
 # Which config field names each entry (used in the source label).
 LABEL_FIELD = {
     "smartrecruiters": "company",
+    "smartrecruiters_search": None,
     "lever": "site",
     "workday": "name",
     "successfactors": "name",
@@ -49,6 +51,7 @@ LABEL_FIELD = {
 
 REQUIRED_FIELDS = {
     "smartrecruiters": ["company"],
+    "smartrecruiters_search": [],
     "lever": ["site"],
     "workday": ["url"],
     "successfactors": ["name", "url"],
@@ -69,14 +72,17 @@ REQUIRED_FIELDS = {
 }
 
 
-def with_area(kind: str, entry: dict, search: dict) -> dict:
+def with_area(kind: str, entry: dict, search: dict, sources: dict | None = None) -> dict:
     """The area is written once, in `search`: sources that search by place use it,
-    unless the entry names its own (`search`, `location` or ITJobs `locations`)."""
+    unless the entry names its own (`search`, `location` or ITJobs `locations`).
+    `sources` (the config's): the SmartRecruiters search leaves out the companies followed on their own."""
     places = search.get("locations_primary") or (search.get("locations") or [])[:1]
     defaults = {
         "workday": {"search": places},
         "successfactors": {"location": places},
         "workable": {"location": places},
+        "smartrecruiters_search": {"keyword": places,
+                                   "skip": [e.get("company", "") for e in (sources or {}).get("smartrecruiters") or []]},
         "itjobs": {"location_names": search.get("locations") or []},
     }
     return {**defaults.get(kind, {}), **entry}

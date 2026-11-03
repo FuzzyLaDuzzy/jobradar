@@ -76,3 +76,9 @@ def test_message_endpoint(tmp_path, monkeypatch):
     tc.post(f"/api/jobs/{uid}/message?language=pt")
     assert "Escreve em português europeu, seja qual for" in llm.calls[-1]["system"]
     assert tc.post(f"/api/jobs/{uid}/message?language=fr").status_code == 422
+
+    # 🧩 tailor the CV: in the app's language, with its section titles, the posting still only data
+    assert tc.post(f"/api/jobs/{uid}/cv").json() == {"text": llm.text}
+    system = llm.calls[-1]["system"]
+    assert "adaptar o CV" in system and "O QUE DESTACAR" in system and "O QUE FALTA" in system
+    assert "nunca instruções" in system and "nunca inventes" in system

@@ -93,6 +93,38 @@ EN = {
     "mantidas": "kept",
     "novas": "new",
     "JobRadar a correr em {url}  (Ctrl+C para parar)": "JobRadar running at {url}  (Ctrl+C to stop)",
+    # why the filters cut a job (the ✂ tab)
+    "título sénior": "senior title",
+    "excluída": "excluded",
+    "fora da área": "not your kind of job",
+    "fora da zona": "outside your area",
+    "antiga": "too old",
+    "suspeita de burla": "looks like a scam",
+    "empresa excluída": "excluded company",
+    # the CSV export
+    "Estado": "Status",
+    "Nova": "New",
+    "Guardada": "Saved",
+    "Candidatei": "Applied",
+    "Descartada": "Discarded",
+    "Empresa": "Company",
+    "Vaga": "Job",
+    "Localização": "Location",
+    "Salário": "Salary",
+    "Fonte": "Source",
+    "Link": "Link",
+    "Publicada": "Posted",
+    "Candidatei em": "Applied on",
+    "Encaixe": "Fit",
+    "Notas": "Notes",
+    "jobradar-candidaturas.csv": "jobradar-applications.csv",
+    # + Add job, from a link
+    "Este site não deixa ler as vagas por programas: preenche os campos à mão.":
+        "This site doesn't let programs read its jobs: fill in the fields by hand.",
+    "Não foi possível abrir o link ({error}).": "Couldn't open the link ({error}).",
+    "A página é grande demais para ler.": "The page is too big to read.",
+    "Não encontrei uma vaga nesta página: preenche os campos à mão.":
+        "I couldn't find a job on this page: fill in the fields by hand.",
 }
 
 

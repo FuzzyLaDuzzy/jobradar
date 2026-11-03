@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 from datetime import date, timedelta
 
+from .i18n import t
 from .models import Job
 from .text import contains_term, matched_terms, normalize
 
@@ -132,3 +133,12 @@ def evaluate(job: Job, search: dict, today: date | None = None) -> tuple[bool, s
     if years:
         flags["years_required"] = years
     return True, None, flags
+
+
+def reason_label(reason: str) -> str:
+    """A reason for cutting a job, in the app's language: "título sénior (lead)" -> "senior title (lead)"."""
+    names = {"título sénior": t("título sénior"), "excluída": t("excluída"), "fora da área": t("fora da área"),
+             "fora da zona": t("fora da zona"), "antiga": t("antiga"), "suspeita de burla": t("suspeita de burla"),
+             "empresa excluída": t("empresa excluída")}
+    name, _, rest = reason.partition(" (")
+    return names.get(name, name) + (f" ({rest}" if rest else "")

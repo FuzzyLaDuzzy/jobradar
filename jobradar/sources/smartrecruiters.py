@@ -3,6 +3,9 @@
 List:   GET https://api.smartrecruiters.com/v1/companies/{company}/postings
 Detail: GET https://api.smartrecruiters.com/v1/companies/{company}/postings/{id}
 No API key needed. The server caps `limit` at 100 and echoes the value it used.
+
+Search: GET https://jobs.smartrecruiters.com/sr-jobs/search?keyword=Braga  (every company, by place;
+        each result links to its detail above)
 """
 
 from __future__ import annotations
@@ -14,6 +17,7 @@ from ..text import strip_html
 from .base import Prefilter
 
 API = "https://api.smartrecruiters.com/v1/companies/{company}/postings"
+SEARCH = "https://jobs.smartrecruiters.com/sr-jobs/search"
 
 
 def _location(loc: dict) -> str:
@@ -61,6 +65,9 @@ def _fill_detail(client: httpx.Client, company: str, job: Job) -> None:
     job.description = "\n\n".join(texts)
     if data.get("postingUrl"):
         job.url = data["postingUrl"]
+    # the search's results leave these empty
+    job.contract = job.contract or (data.get("typeOfEmployment") or {}).get("label", "") or ""
+    job.experience = job.experience or (data.get("experienceLevel") or {}).get("label", "") or ""
 
 
 def fetch(
@@ -101,3 +108,32 @@ def fetch(
                 pass  # keep the job with its list data only
             details += 1
     return jobs
+
+
+def search(client: httpx.Client, entry: dict, prefilter: Prefilter = None, max_details: int = 80) -> list[Job]:
+    """SmartRecruiters' public job search, by place (`keyword`, from `search`): every company on SmartRecruiters
+    with jobs there, like the Workable search. The companies followed on their own (`skip`) are left to them."""
+    skip = {name.lower() for name in entry.get("skip") or []}
+    places = entry.get("keyword") or []
+    jobs: dict[str, tuple[str, Job]] = {}
+    for place in [places] if isinstance(places, str) else places:
+        # ponytail: no paging works here (offset, page...), so only the 100 newest per place: enough twice a day
+        resp = client.get(SEARCH, params={"keyword": place, "limit": 100}, headers={"Accept": "application/json"})
+        resp.raise_for_status()
+        for item in resp.json().get("content") or []:
+            company = (item.get("company") or {}).get("identifier") or ""
+            details = (item.get("actions") or {}).get("details") or ""
+            if not company or not details or company.lower() in skip:
+                continue
+            # the search has its own id: the detail link carries the posting's, as the company API knows it
+            job = to_job(company, {**item, "id": details.rstrip("/").rsplit("/", 1)[-1]})
+            job.source = "smartrecruiters_search"
+            jobs.setdefault(job.external_id, (company, job))
+
+    wanted = [(company, job) for company, job in jobs.values() if prefilter is None or prefilter(job)]
+    for company, job in wanted[:max_details]:
+        try:
+            _fill_detail(client, company, job)
+        except httpx.HTTPError:
+            pass  # keep the job with its list data only
+    return [job for _, job in jobs.values()]
