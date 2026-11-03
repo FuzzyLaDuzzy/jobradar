@@ -93,7 +93,7 @@ def test_message_with_gemini(cfg, monkeypatch):
     monkeypatch.setenv("GEMINI_API_KEY", "k")
 
     def handler(request):
-        assert request.url.path.endswith("/gemini-3.8-flash:generateContent")  # better model for writing
+        assert request.url.path.endswith("/gemini-3.5-flash-lite:generateContent")  # the default writes too
         assert "<anuncio>" in json.loads(request.content)["contents"][0]["parts"][0]["text"]
         return httpx.Response(200, json=ANSWER)
 
@@ -112,8 +112,10 @@ def test_busy_writing_model_falls_back_to_the_light_one(cfg, monkeypatch, status
             return httpx.Response(status, json={"error": {"code": status, "message": "high demand"}})
         return httpx.Response(200, json=ANSWER)
 
+    chosen = gemini_cfg(cfg)
+    chosen["scoring"]["llm"]["message_model"] = "gemini-3.8-flash"  # a bigger model, chosen in ⚙
     job = {"title": "QA Analyst", "company": "Uphold", "description": "Testing"}
-    assert message.write(job, gemini_cfg(cfg), client(handler)) == "Subject: Application\n\nHello"
+    assert message.write(job, chosen, client(handler)) == "Subject: Application\n\nHello"
     assert seen == ["gemini-3.8-flash:generateContent", "gemini-3.5-flash-lite:generateContent"]
 
 

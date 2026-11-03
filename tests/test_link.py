@@ -13,6 +13,12 @@ POSTING = {"@context": "https://schema.org", "@type": "JobPosting", "title": "Ju
            "jobLocation": [{"@type": "Place", "address": {"addressLocality": "Braga", "addressCountry": "PT"}}]}
 
 
+@pytest.fixture(autouse=True)
+def public_names(monkeypatch):
+    """The made-up hosts below don't exist: every name counts as public, unless a test says otherwise."""
+    monkeypatch.setattr(link, "_is_public", lambda host: True)
+
+
 def page(*blocks, head=""):
     scripts = "".join(f'<script type="application/ld+json">{json.dumps(b)}</script>' for b in blocks)
     return f"<html><head>{head}{scripts}</head><body>…</body></html>"
@@ -52,3 +58,46 @@ def test_errors():
         link.read("https://x.pt/404", client("", status=404))
     with pytest.raises(link.LinkError, match="Não encontrei"):
         link.read("https://x.pt/empty", client("<html><body>nada</body></html>"))
+
+
+def test_local_and_private_addresses_are_not_opened(monkeypatch):
+    monkeypatch.undo()  # the real check: these are IPs, nothing to look up
+    seen = []
+    any_page = httpx.Client(transport=httpx.MockTransport(lambda r: seen.append(r) or httpx.Response(200, text="x")))
+    for url in ("http://127.0.0.1:8000/api/keys", "http://192.168.1.1/", "http://169.254.169.254/latest/meta-data/"):
+        with pytest.raises(link.LinkError, match="local ou privado"):
+            link.read(url, any_page)
+    assert seen == []
+
+
+def test_every_redirect_hop_is_checked(monkeypatch):
+    monkeypatch.setattr(link, "_is_public", lambda host: host != "intranet.local")
+    hops = []
+
+    def handler(request):
+        hops.append(request.url.host)
+        return httpx.Response(302, headers={"location": "http://intranet.local/admin"})
+
+    with pytest.raises(link.LinkError, match="local ou privado"):
+        link.read("https://short.link/abc", httpx.Client(transport=httpx.MockTransport(handler)))
+    assert hops == ["short.link"]  # the private address is never asked for
+
+
+def test_a_redirect_to_a_public_page_is_followed():
+    def handler(request):
+        if request.url.path == "/abc":
+            return httpx.Response(301, headers={"location": "https://careers.acme.pt/jobs/42"})
+        return httpx.Response(200, text=page(POSTING))
+
+    job = link.read("https://short.link/abc", httpx.Client(transport=httpx.MockTransport(handler)))
+    assert (job["title"], job["url"]) == ("Junior Backend Developer", "https://careers.acme.pt/jobs/42")
+
+
+def test_a_page_too_big_stops_being_read(monkeypatch):
+    monkeypatch.setattr(link, "MAX_BYTES", 1000)
+    with pytest.raises(link.LinkError, match="grande demais"):  # said up front
+        link.read("https://x.pt/big", httpx.Client(transport=httpx.MockTransport(
+            lambda r: httpx.Response(200, headers={"content-length": "5000"}, content=b"x" * 10))))
+    with pytest.raises(link.LinkError, match="grande demais"):  # or only found out while reading
+        link.read("https://x.pt/big", httpx.Client(transport=httpx.MockTransport(
+            lambda r: httpx.Response(200, content=iter([b"x" * 600, b"x" * 600])))))

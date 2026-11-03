@@ -123,6 +123,12 @@ EN = {
         "This site doesn't let programs read its jobs: fill in the fields by hand.",
     "Não foi possível abrir o link ({error}).": "Couldn't open the link ({error}).",
     "A página é grande demais para ler.": "The page is too big to read.",
+    "Este link aponta para um endereço local ou privado: a app não o abre.":
+        "This link points to a local or private address: the app won't open it.",
+    "O link redireciona vezes demais.": "The link redirects too many times.",
+    # ⚙ the AI model
+    "Claude: Haiku 5.5 avalia, Opus 5.5 escreve": "Claude: Haiku 5.5 scores, Opus 5.5 writes",
+    "Modelo de IA desconhecido.": "Unknown AI model.",
     "Não encontrei uma vaga nesta página: preenche os campos à mão.":
         "I couldn't find a job on this page: fill in the fields by hand.",
 }

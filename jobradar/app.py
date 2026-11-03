@@ -82,9 +82,10 @@ def _salary(job: dict) -> dict | None:
 
 
 def _cell(value) -> str:
-    """A spreadsheet cell: text that starts like a formula ("=", "+", "@") would run in Excel, so it gets a quote."""
+    """A spreadsheet cell: text that starts like a formula (=, +, -, @, or a tab or return before one) could run
+    in Excel, so it gets a quote in front and stays text."""
     text = "" if value is None else str(value)
-    return "'" + text if text[:1] in ("=", "+", "@") or (text[:1] == "-" and text[1:2] not in (" ", "")) else text
+    return "'" + text if text[:1] in ("=", "+", "-", "@", "\t", "\r") else text
 
 
 class ConfigBody(BaseModel):
@@ -93,6 +94,10 @@ class ConfigBody(BaseModel):
 
 class LanguageBody(BaseModel):
     language: str
+
+
+class AiBody(BaseModel):
+    choice: str = Field(min_length=1, max_length=100)  # "gemini:<model>" or "anthropic"
 
 
 class KeysBody(BaseModel):
@@ -415,6 +420,31 @@ def create_app(
         except config_mod.ConfigError as exc:
             raise HTTPException(400, str(exc)) from exc
         return {"ok": True}
+
+    @app.get("/api/ai")
+    def get_ai():
+        """⚙ The AI model: the choices (Google's own list of Gemini models, when the key can read it) and the current one."""
+        try:
+            cfg = config_mod.load(config_path)
+        except config_mod.ConfigError as exc:
+            raise HTTPException(400, t("Configuração inválida: {error}", error=exc)) from exc
+        settings = scoring.llm_settings(cfg)
+        models = (gemini.list_models() if os.environ.get("GEMINI_API_KEY") else []) or scoring.GEMINI_MODELS
+        if settings["provider"] == "gemini":
+            models = models + [settings["model"]]  # the one in use stays on the list, even if Google drops it
+        return {"current": scoring.current_choice(cfg), "choices": scoring.ai_choices(models)}
+
+    @app.put("/api/ai")
+    def set_ai(body: AiBody):
+        choice = scoring.ai_choice(body.choice)
+        if choice is None:
+            raise HTTPException(400, t("Modelo de IA desconhecido."))
+        try:
+            config_mod.update({("scoring.llm", key): choice[key] for key in ("provider", "model", "message_model")},
+                              config_path)
+        except config_mod.ConfigError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        return {"current": choice["id"]}
 
     @app.get("/api/language")
     def get_language():

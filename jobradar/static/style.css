@@ -227,6 +227,11 @@ details textarea {
 .sheet .keys span { padding: 4px 10px; border-radius: 999px; background: var(--surface-2); }
 .sheet .keys .ok { background: var(--accent-soft); color: var(--accent); }
 .sheet .keys .missing { background: var(--warn-bg); color: var(--warn); }
+.sheet .ai-model { display: grid; gap: 4px; margin-top: 12px; font-size: 13px; font-weight: 600; }
+.sheet .ai-model select {
+  font: inherit; font-size: 14px; font-weight: 400; color: var(--text); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 10px; padding: 8px 11px; max-width: 420px;
+}
 .yaml {
   flex: 1; min-height: 360px; width: 100%; resize: vertical; tab-size: 2;
   font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;

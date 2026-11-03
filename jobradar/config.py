@@ -152,19 +152,35 @@ def _same(old, new) -> bool:
     return old == new or (old is None and new in ("", []))
 
 
+def _node(root, section: str):
+    """The mapping at a dotted path ("scoring.llm"), or None."""
+    node = root
+    for part in section.split("."):
+        if not isinstance(node, yaml.MappingNode):
+            return None
+        node = next((v for k, v in node.value if k.value == part), None)
+    return node
+
+
+def _section(data, section: str) -> dict:
+    for part in section.split("."):
+        data = data.get(part) if isinstance(data, dict) else None
+    return data if isinstance(data, dict) else {}
+
+
 def update(changes: dict[tuple[str, str], object], path: Path | str = DEFAULT_CONFIG) -> dict:
-    """Change some values of config.yaml (the 👤 Profile screen) and leave every other character
-    as it was: comments, order, line breaks. PyYAML says where each value starts and ends."""
+    """Change some values of config.yaml (the 👤 Profile screen, the ⚙ AI model) and leave every other
+    character as it was: comments, order, line breaks. PyYAML says where each value starts and ends.
+    A section can be a dotted path ("scoring.llm")."""
     text = read_text(path)
     current = yaml.safe_load(text) or {}
     root = yaml.compose(text)
-    sections = {k.value: v for k, v in root.value} if isinstance(root, yaml.MappingNode) else {}
     edits: list[tuple[int, int, str]] = []
     for section in dict.fromkeys(s for s, _ in changes):
         wanted = {k: v for (s, k), v in changes.items() if s == section
-                  and not _same((current.get(section) or {}).get(k), v)}
-        mapping = sections.get(section)
-        if wanted and section not in sections:  # e.g. no `profile:` yet: a new section at the end
+                  and not _same(_section(current, section).get(k), v)}
+        mapping = _node(root, section)
+        if wanted and mapping is None and "." not in section:  # e.g. no `profile:` yet: a new section at the end
             lines = [f"  {_render(k, v, 2)}" for k, v in wanted.items() if v not in ("", [], None)]
             sep = "" if text.endswith("\n") else "\n"
             edits.append((len(text), len(text), f"{sep}{section}:\n" + "\n".join(lines) + "\n"))
@@ -187,13 +203,17 @@ def update(changes: dict[tuple[str, str], object], path: Path | str = DEFAULT_CO
                 added.append(" " * indent + _render(key, value, indent))
         if added:
             end = _value_end(mapping)
-            at_line_start = text[end - 1] == "\n"
-            edits.append((end, end, ("" if at_line_start else "\n") + "\n".join(added) + ("\n" if at_line_start else "")))
+            if text[end - 1] == "\n":
+                edits.append((end, end, "\n".join(added) + "\n"))
+            else:  # after the last value's own comment ("40  # ..."), which stays on its line
+                line_end = text.find("\n", end)
+                end = len(text) if line_end < 0 else line_end
+                edits.append((end, end, "\n" + "\n".join(added)))
     for start, end, new in sorted(edits, reverse=True):
         text = text[:start] + new + text[end:]
     cfg = parse(text)
     for (section, key), value in changes.items():  # what YAML reads back must be what was asked
-        if not _same((cfg.get(section) or {}).get(key), value):
+        if not _same(_section(cfg, section).get(key), value):
             raise ConfigError(t("Não foi possível gravar {field}: confirma o valor.", field=f"{section}.{key}"))
     return save_text(text, path)
 

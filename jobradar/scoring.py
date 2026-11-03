@@ -17,9 +17,44 @@ from .text import matched_terms, normalize
 
 # provider: (key in .env, model that scores every job, model that writes application messages)
 PROVIDERS = {
-    "gemini": ("GEMINI_API_KEY", "gemini-3.5-flash-lite", "gemini-3.8-flash"),  # free tier
+    "gemini": ("GEMINI_API_KEY", "gemini-3.5-flash-lite", "gemini-3.5-flash-lite"),  # free tier
     "anthropic": ("ANTHROPIC_API_KEY", "claude-haiku-5-5", "claude-opus-5-5"),
 }
+# ⚙ the AI model: Google's own list (gemini.list_models), else these; one Gemini model scores and writes
+GEMINI_MODELS = ["gemini-3.5-flash-lite", "gemini-3.5-flash", "gemini-3.8-flash", "gemini-2.5-flash-lite", "gemini-2.5-flash"]
+_VARIANTS = ("flash-lite", "flash", "pro")
+
+
+def _gemini_order(model: str) -> tuple:
+    """Newest version first; within one, Flash Lite, Flash, Pro; previews after."""
+    match = gemini.MODEL_RE.match(model)
+    major, minor = (match.group(1) + ".0").split(".")[:2]  # "3" is 3.0, older than 3.8
+    return (-int(major), -int(minor)), _VARIANTS.index(match.group(2)), bool(match.group(3))
+
+
+def ai_choice(choice: str) -> dict | None:
+    """One ⚙ choice: "gemini:<model>" (any Gemini text model, as Google names them) or "anthropic"."""
+    if choice == "anthropic":
+        _, model, writes = PROVIDERS["anthropic"]
+        return {"id": "anthropic", "provider": "anthropic", "model": model, "message_model": writes,
+                "label": i18n.t("Claude: Haiku 5.5 avalia, Opus 5.5 escreve"), "default": False}
+    provider, _, model = choice.partition(":")
+    if provider != "gemini" or not gemini.MODEL_RE.match(model):
+        return None
+    words = model.removeprefix("gemini-").replace("-preview", "").split("-")
+    label = "Gemini " + " ".join(w.capitalize() for w in words) + (" (preview)" if model.endswith("-preview") else "")
+    return {"id": choice, "provider": "gemini", "model": model, "message_model": model, "label": label,
+            "default": model == PROVIDERS["gemini"][1]}
+
+
+def ai_choices(gemini_models: list[str]) -> list[dict]:
+    models = sorted({m for m in gemini_models if gemini.MODEL_RE.match(m)} | {PROVIDERS["gemini"][1]}, key=_gemini_order)
+    return [ai_choice(f"gemini:{m}") for m in models] + [ai_choice("anthropic")]
+
+
+def current_choice(cfg: dict) -> str:
+    settings = llm_settings(cfg)
+    return "anthropic" if settings["provider"] == "anthropic" else f"gemini:{settings['model']}"
 
 
 def llm_settings(cfg: dict) -> dict:

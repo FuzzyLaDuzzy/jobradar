@@ -96,6 +96,14 @@ const EN = {
   "Licença MIT": "MIT License",
   "🧩 Ajustar o CV": "🧩 Tailor my CV",
   "✂ Cortadas": "✂ Cut",
+  "Modelo de IA": "AI model",
+  "Gemini (Google, grátis)": "Gemini (Google, free)",
+  "Claude (Anthropic, pago)": "Claude (Anthropic, paid)",
+  "por omissão": "default",
+  "Avalia as vagas novas e escreve as mensagens, os ajustes ao CV e a preparação da entrevista. Se um modelo maior estiver ocupado, as mensagens passam para o Gemini 3.5 Flash Lite.":
+    "It scores new jobs and writes the messages, the CV tailoring and the interview prep. If a bigger model is busy, messages switch to Gemini 3.5 Flash Lite.",
+  "Modelo de IA: {model}": "AI model: {model}",
+  "Não foi possível mudar o modelo: {error}": "Couldn't change the model: {error}",
   "Salário indicado no anúncio": "Salary stated in the posting",
   "Salário ≥": "Salary ≥",
   "€/mês": "€/month",
@@ -379,6 +387,9 @@ createApp({
       minSalary: saved.minSalary || 0,
       settingsOpen: false,
       configText: "",
+      ai: { current: "", choices: [] }, // ⚙ the AI model
+      aiChoice: "",
+      savingAi: false,
       configError: "",
       keys: {},
       savingConfig: false,
@@ -874,8 +885,28 @@ createApp({
         this.configText = data.yaml;
         this.keys = data.keys;
         this.settingsOpen = true;
+        this.api("/api/ai").then((ai) => {
+          this.ai = ai;
+          this.aiChoice = ai.current;
+        }).catch(() => {}); // without it, the select just stays empty
       } catch (e) {
         this.error = e.message;
+      }
+    },
+
+    async saveAi() {
+      this.savingAi = true;
+      try {
+        await this.api("/api/ai", { method: "PUT", body: JSON.stringify({ choice: this.aiChoice }) });
+        this.ai.current = this.aiChoice;
+        this.configText = (await this.api("/api/config")).yaml; // the text below now has the new model
+        const choice = this.ai.choices.find((c) => c.id === this.aiChoice);
+        this.showToast(this.t("Modelo de IA: {model}", { model: choice ? choice.label : this.aiChoice }));
+      } catch (e) {
+        this.aiChoice = this.ai.current;
+        this.showToast(this.t("Não foi possível mudar o modelo: {error}", { error: e.message }));
+      } finally {
+        this.savingAi = false;
       }
     },
 

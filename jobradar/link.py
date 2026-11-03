@@ -7,9 +7,11 @@ Only on request, one page at a time. LinkedIn, Indeed and Glassdoor are not open
 from __future__ import annotations
 
 import html
+import ipaddress
 import json
 import re
-from urllib.parse import urlsplit
+import socket
+from urllib.parse import urljoin, urlsplit
 
 import httpx
 
@@ -18,6 +20,7 @@ from .text import strip_html
 
 BLOCKED = ("linkedin.com", "indeed.", "glassdoor.")
 MAX_BYTES = 3_000_000
+MAX_REDIRECTS = 5
 _LD_RE = re.compile(r"<script[^>]+type=[\"']application/ld\+json[\"'][^>]*>(.*?)</script>", re.S | re.I)
 
 
@@ -93,19 +96,53 @@ def parse(page: str) -> dict:
             "description": _meta(page, "og:description") or _meta(page, "description")}
 
 
-def read(url: str, client: httpx.Client) -> dict:
-    host = (urlsplit(url).hostname or "").lower()
-    if any(name in host for name in BLOCKED):
-        raise LinkError(t("Este site não deixa ler as vagas por programas: preenche os campos à mão."))
+def _is_public(host: str) -> bool:
+    """Every address the name resolves to is on the internet: not this computer, the home network or the cloud's
+    metadata address. ponytail: httpx resolves the name again to connect, so a name that changes in between
+    could slip through; connect to the checked IP if that ever matters."""
     try:
-        resp = client.get(url)
-        resp.raise_for_status()
+        infos = socket.getaddrinfo(host, None)
+    except (OSError, UnicodeError):
+        return False
+    return bool(infos) and all(ipaddress.ip_address(info[4][0].split("%")[0]).is_global for info in infos)
+
+
+def _fetch(url: str, client: httpx.Client) -> tuple[str, str]:
+    """The page and its final address. Redirects are followed one by one so every hop is checked, and the
+    reading stops as soon as the page passes MAX_BYTES."""
+    for _ in range(MAX_REDIRECTS + 1):
+        parts = urlsplit(url)
+        host = (parts.hostname or "").lower()
+        if parts.scheme not in ("http", "https") or not host:
+            raise LinkError(t("o link tem de começar por http:// ou https://"))
+        if any(name in host for name in BLOCKED):
+            raise LinkError(t("Este site não deixa ler as vagas por programas: preenche os campos à mão."))
+        if not _is_public(host):
+            raise LinkError(t("Este link aponta para um endereço local ou privado: a app não o abre."))
+        with client.stream("GET", url, follow_redirects=False) as resp:
+            if resp.is_redirect:
+                url = urljoin(url, resp.headers.get("location", ""))
+                continue
+            resp.raise_for_status()
+            if int(resp.headers.get("content-length") or 0) > MAX_BYTES:
+                raise LinkError(t("A página é grande demais para ler."))
+            chunks, total = [], 0
+            for chunk in resp.iter_bytes():
+                total += len(chunk)
+                if total > MAX_BYTES:
+                    raise LinkError(t("A página é grande demais para ler."))
+                chunks.append(chunk)
+            return b"".join(chunks).decode(resp.encoding or "utf-8", errors="replace"), url
+    raise LinkError(t("O link redireciona vezes demais."))
+
+
+def read(url: str, client: httpx.Client) -> dict:
+    try:
+        page, final = _fetch(url, client)
     except httpx.HTTPError as exc:
         raise LinkError(t("Não foi possível abrir o link ({error}).", error=type(exc).__name__)) from exc
-    if len(resp.content) > MAX_BYTES:
-        raise LinkError(t("A página é grande demais para ler."))
-    job = parse(resp.text)
+    job = parse(page)
     if not job["title"]:
         raise LinkError(t("Não encontrei uma vaga nesta página: preenche os campos à mão."))
     limits = {"title": 200, "company": 200, "location": 200, "posted_at": 10, "description": 20000}
-    return {key: value[:limits[key]] for key, value in job.items()} | {"url": str(resp.url)}
+    return {key: value[:limits[key]] for key, value in job.items()} | {"url": final}

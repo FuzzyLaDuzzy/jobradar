@@ -212,6 +212,19 @@
         <span :class="keys.GEMINI_API_KEY || keys.ANTHROPIC_API_KEY ? 'ok' : 'missing'">{{ t('IA (avaliação e mensagens): {state}', { state: keys.GEMINI_API_KEY || keys.ANTHROPIC_API_KEY ? t('chave encontrada') : t('desligada (opcional, GEMINI_API_KEY ou ANTHROPIC_API_KEY)') }) }}</span>
         <button class="btn" @click="openKeys()">🔑 {{ t('Chaves de API') }}</button>
       </div>
+      <label class="ai-model">{{ t('Modelo de IA') }}
+        <select v-model="aiChoice" @change="saveAi" :disabled="savingAi || !ai.choices.length">
+          <optgroup :label="t('Gemini (Google, grátis)')">
+            <option v-for="c in ai.choices.filter((c) => c.provider === 'gemini')" :key="c.id" :value="c.id">
+              {{ c.label }}{{ c.default ? ' · ' + t('por omissão') : '' }}
+            </option>
+          </optgroup>
+          <optgroup :label="t('Claude (Anthropic, pago)')">
+            <option v-for="c in ai.choices.filter((c) => c.provider === 'anthropic')" :key="c.id" :value="c.id">{{ c.label }}</option>
+          </optgroup>
+        </select>
+      </label>
+      <p class="muted small">{{ t('Avalia as vagas novas e escreve as mensagens, os ajustes ao CV e a preparação da entrevista. Se um modelo maior estiver ocupado, as mensagens passam para o Gemini 3.5 Flash Lite.') }}</p>
       <p class="muted small">{{ t('Edita a zona, o tipo de trabalho, as fontes e o teu perfil. Depois de guardar, carrega em') }} <b>{{ t('Procurar vagas') }}</b>.</p>
       <textarea class="yaml" v-model="configText" spellcheck="false"></textarea>
       <p class="alert" v-if="configError">{{ configError }}</p>

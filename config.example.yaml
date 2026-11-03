@@ -197,7 +197,7 @@ scoring:
   llm:
     enabled: true             # only runs when the provider's key is in .env
     # gemini: free (GEMINI_API_KEY, aistudio.google.com) | anthropic: paid (ANTHROPIC_API_KEY)
-    # Default models: gemini-3.5-flash-lite scores, gemini-3.8-flash writes
-    # (anthropic: claude-haiku-5-5 and claude-opus-5-5). To change them: model / message_model.
+    # Default model: gemini-3.5-flash-lite, for scoring and writing (anthropic: claude-haiku-5-5 scores,
+    # claude-opus-5-5 writes). Choose another in ⚙ Settings, or set model / message_model here.
     provider: gemini
     max_jobs_per_refresh: 40  # at most this many new jobs scored by the AI per refresh

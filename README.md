@@ -150,7 +150,7 @@ The first time you open JobRadar, a welcome screen lets you pick the language an
 | `GEMINI_API_KEY` | Free AI: scores each job, writes messages and interview notes | <https://aistudio.google.com/apikey> |
 | `ANTHROPIC_API_KEY` | The same with Claude, paid (`scoring.llm.provider: anthropic`) | <https://console.anthropic.com> |
 
-Without keys, every source except ITJobs works, and scores use keywords only. With Gemini, JobRadar scores with `gemini-3.5-flash-lite` and writes with `gemini-3.8-flash`; with Anthropic, Claude Haiku 5.5 and Opus 5.5. The free Gemini tier has rate limits: jobs it couldn't score are scored on the next refresh. Read Google's terms for how free-tier requests may be used in your region. Always review what the AI writes before sending it.
+Without keys, every source except ITJobs works, and scores use keywords only. With Gemini, JobRadar scores and writes with `gemini-3.5-flash-lite` by default; pick another model in **⚙ Settings → AI model** (the list is the one Google offers your key, newest first), or Claude (Anthropic: Haiku 5.5 scores, Opus 5.5 writes). If a bigger Gemini model is busy, messages switch to the light one. The free Gemini tier has rate limits: jobs it couldn't score are scored on the next refresh. Read Google's terms for how free-tier requests may be used in your region. Always review what the AI writes before sending it.
 
 ### Find the companies in your area
 

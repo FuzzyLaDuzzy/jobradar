@@ -9,12 +9,16 @@ from __future__ import annotations
 
 import base64
 import os
+import re
 
 import httpx
 
 from .i18n import t
 
 API = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+MODELS = "https://generativelanguage.googleapis.com/v1beta/models"
+# the text models worth offering: gemini-3.5-flash-lite, gemini-3.8-flash, gemini-3.1-pro-preview...
+MODEL_RE = re.compile(r"^gemini-(\d+(?:\.\d+)?)-(flash-lite|flash|pro)(-preview)?$")
 
 
 class GeminiError(RuntimeError):
@@ -80,3 +84,22 @@ def generate(prompt: str, model: str, system: str = "", max_tokens: int = 8192,
     if not text:
         raise GeminiError(t("O Gemini não devolveu texto ({reason}).", reason=candidates[0].get("finishReason", "?")))
     return text
+
+
+def list_models(client: httpx.Client | None = None, api_key: str | None = None) -> list[str]:
+    """The Gemini text models this key can use, as Google lists them today; [] if the list can't be read."""
+    own = client is None
+    client = client or httpx.Client(timeout=10.0)
+    try:
+        resp = client.get(MODELS, params={"pageSize": 200},
+                          headers={"x-goog-api-key": api_key or os.environ.get("GEMINI_API_KEY", "")})
+        resp.raise_for_status()
+        models = resp.json().get("models") or []
+    except (httpx.HTTPError, ValueError):
+        return []
+    finally:
+        if own:
+            client.close()
+    names = [m.get("name", "").removeprefix("models/") for m in models
+             if "generateContent" in (m.get("supportedGenerationMethods") or [])]
+    return [name for name in names if MODEL_RE.match(name)]
