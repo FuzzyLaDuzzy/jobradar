@@ -247,4 +247,4 @@ tests/              pytest
 
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) © 2026 Flávio Silva

@@ -63,6 +63,8 @@ body {
 
 .muted { color: var(--muted); }
 .small { font-size: 13px; }
+.credit { text-align: center; margin-top: 32px; }
+.credit a { color: inherit; }
 
 /* header */
 .top { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }

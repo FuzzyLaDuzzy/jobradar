@@ -92,6 +92,7 @@ const EN = {
   "Notas (ex.: enviei o CV a 30/10, contacto da recrutadora…)": "Notes (e.g. sent my CV on 30/10, the recruiter's contact…)",
   "A escrever…": "Writing…",
   "↻ Outra versão da mensagem": "↻ Another version of the message",
+  "Licença MIT": "MIT License",
   "Reescrever em inglês": "Rewrite in English",
   "Reescrever em português": "Rewrite in Portuguese",
   "✉ Gerar mensagem de candidatura": "✉ Write application message",
