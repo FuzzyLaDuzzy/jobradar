@@ -96,15 +96,16 @@ def parse(page: str) -> dict:
             "description": _meta(page, "og:description") or _meta(page, "description")}
 
 
-def _is_public(host: str) -> bool:
-    """Every address the name resolves to is on the internet: not this computer, the home network or the cloud's
-    metadata address. ponytail: httpx resolves the name again to connect, so a name that changes in between
-    could slip through; connect to the checked IP if that ever matters."""
+def _resolve(host: str) -> str | None:
+    """The address to connect to, when every address the name has is on the internet (not this computer, the home
+    network or the cloud's metadata address); else None. The request then goes to this very address, so a name
+    that answers differently a second time (DNS rebinding) can't send it elsewhere."""
     try:
-        infos = socket.getaddrinfo(host, None)
+        infos = socket.getaddrinfo(host, None, type=socket.SOCK_STREAM)
     except (OSError, UnicodeError):
-        return False
-    return bool(infos) and all(ipaddress.ip_address(info[4][0].split("%")[0]).is_global for info in infos)
+        return None
+    ips = [info[4][0].split("%")[0] for info in infos]
+    return ips[0] if ips and all(ipaddress.ip_address(ip).is_global for ip in ips) else None
 
 
 def _fetch(url: str, client: httpx.Client) -> tuple[str, str]:
@@ -117,9 +118,14 @@ def _fetch(url: str, client: httpx.Client) -> tuple[str, str]:
             raise LinkError(t("o link tem de começar por http:// ou https://"))
         if any(name in host for name in BLOCKED):
             raise LinkError(t("Este site não deixa ler as vagas por programas: preenche os campos à mão."))
-        if not _is_public(host):
+        ip = _resolve(host)
+        if ip is None:
             raise LinkError(t("Este link aponta para um endereço local ou privado: a app não o abre."))
-        with client.stream("GET", url, follow_redirects=False) as resp:
+        # to the checked address, with the site's name where the server and TLS (certificate, SNI) expect it
+        name = host + (f":{parts.port}" if parts.port else "")
+        target = parts._replace(netloc=(f"[{ip}]" if ":" in ip else ip) + (f":{parts.port}" if parts.port else ""))
+        with client.stream("GET", target.geturl(), headers={"Host": name}, extensions={"sni_hostname": host},
+                           follow_redirects=False) as resp:
             if resp.is_redirect:
                 url = urljoin(url, resp.headers.get("location", ""))
                 continue

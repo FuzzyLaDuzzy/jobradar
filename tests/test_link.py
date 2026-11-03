@@ -15,8 +15,8 @@ POSTING = {"@context": "https://schema.org", "@type": "JobPosting", "title": "Ju
 
 @pytest.fixture(autouse=True)
 def public_names(monkeypatch):
-    """The made-up hosts below don't exist: every name counts as public, unless a test says otherwise."""
-    monkeypatch.setattr(link, "_is_public", lambda host: True)
+    """The made-up hosts below don't exist: every name gets a public address, unless a test says otherwise."""
+    monkeypatch.setattr(link, "_resolve", lambda host: "93.184.215.14")
 
 
 def page(*blocks, head=""):
@@ -71,11 +71,11 @@ def test_local_and_private_addresses_are_not_opened(monkeypatch):
 
 
 def test_every_redirect_hop_is_checked(monkeypatch):
-    monkeypatch.setattr(link, "_is_public", lambda host: host != "intranet.local")
+    monkeypatch.setattr(link, "_resolve", lambda host: None if host == "intranet.local" else "93.184.215.14")
     hops = []
 
     def handler(request):
-        hops.append(request.url.host)
+        hops.append(request.headers["host"])
         return httpx.Response(302, headers={"location": "http://intranet.local/admin"})
 
     with pytest.raises(link.LinkError, match="local ou privado"):
@@ -101,3 +101,16 @@ def test_a_page_too_big_stops_being_read(monkeypatch):
     with pytest.raises(link.LinkError, match="grande demais"):  # or only found out while reading
         link.read("https://x.pt/big", httpx.Client(transport=httpx.MockTransport(
             lambda r: httpx.Response(200, content=iter([b"x" * 600, b"x" * 600])))))
+
+
+def test_the_request_goes_to_the_address_that_was_checked():
+    seen = []
+
+    def handler(request):
+        seen.append((request.url.host, request.headers["host"], request.extensions.get("sni_hostname")))
+        return httpx.Response(200, text=page(POSTING))
+
+    job = link.read("https://careers.acme.pt:8443/jobs/42", httpx.Client(transport=httpx.MockTransport(handler)))
+    # no second lookup in between (DNS rebinding): the IP, with the site's name for the server and the certificate
+    assert seen == [("93.184.215.14", "careers.acme.pt:8443", "careers.acme.pt")]
+    assert job["url"] == "https://careers.acme.pt:8443/jobs/42"

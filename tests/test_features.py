@@ -82,7 +82,7 @@ def test_add_job_from_a_link(client, monkeypatch):
             '"hiringOrganization": {"name": "Acme"}, "datePosted": "2026-10-30", "description": "Testes"}</script>')
     monkeypatch.setattr(app_module, "make_client",
                         lambda: httpx.Client(transport=httpx.MockTransport(lambda r: httpx.Response(200, text=page))))
-    monkeypatch.setattr(link, "_is_public", lambda host: True)  # careers.acme.pt is made up
+    monkeypatch.setattr(link, "_resolve", lambda host: "93.184.215.14")  # careers.acme.pt is made up
     job = client.post("/api/jobs/from-url", json={"url": "https://careers.acme.pt/qa"}).json()
     assert (job["title"], job["company"], job["posted_at"]) == ("QA Engineer", "Acme", "2026-10-30")
     saved = client.post("/api/jobs", json={k: job[k] for k in ("title", "company", "url", "description", "posted_at")}).json()
