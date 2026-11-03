@@ -1,4 +1,5 @@
-"""Recruitee (Mercedes-Benz.io), Zoho Recruit (Edigma) and Eurotux, from real answers cut down to a few fields."""
+"""Recruitee (Mercedes-Benz.io), Zoho Recruit (Edigma), Eurotux, Teamtailor (Nutrium) and Balanças Marques (with SDILAB),
+from real answers cut down to a few fields."""
 
 import html
 import json
@@ -6,7 +7,7 @@ import json
 import httpx
 import pytest
 
-from jobradar.sources import eurotux, recruitee, zohorecruit
+from jobradar.sources import balancasmarques, eurotux, recruitee, teamtailor, zohorecruit
 
 # --- Recruitee ---------------------------------------------------------------
 
@@ -114,3 +115,96 @@ def test_eurotux_list_and_detail(make_client):
     assert devops.posted_at == "2026-08-05"  # dateModified: the 2020 page is reused for each new job
     assert "Ansible and Terraform" in devops.description and "NEWSLETTER" not in devops.description
     assert seen == ["/careers/job-opportunities/", "/careers/devops-aws-braga-ref0032026-joboffer/"]  # no page for the other
+
+
+# --- Teamtailor --------------------------------------------------------------
+
+TEAMTAILOR_RSS = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:tt="https://teamtailor.com/locations"><channel><title>Nutrium</title>
+<item>
+  <title>Android Developer</title>
+  <description><![CDATA[<p>Welcome to Nutrium.</p><ul><li>Kotlin and Jetpack Compose</li></ul>]]></description>
+  <pubDate>Wed, 14 Oct 2026 10:12:31 +0100</pubDate>
+  <link>https://careers.nutrium.com/jobs/8543944-android-developer</link>
+  <guid isPermaLink="false">77e7f98c-61cc-4783-9efc-842a9e9ab6de</guid>
+  <remoteStatus>fully</remoteStatus>
+  <tt:department>Engineering</tt:department>
+  <tt:locations><tt:location><tt:name>Portugal</tt:name><tt:city>Braga</tt:city><tt:country>Portugal</tt:country></tt:location></tt:locations>
+</item>
+<item>
+  <title>Platform Security Engineer</title>
+  <description><![CDATA[<p>Cloud security at Coverflex.</p>]]></description>
+  <pubDate>Wed, 30 Sep 2026 09:00:00 +0100</pubDate>
+  <link>https://coverflex.teamtailor.com/jobs/7000001-platform-security-engineer</link>
+  <remoteStatus>hybrid</remoteStatus>
+  <tt:locations></tt:locations>
+</item>
+</channel></rss>"""
+
+
+def test_teamtailor_feed(make_client):
+    seen = []
+
+    def handler(request):
+        seen.append(str(request.url))
+        return httpx.Response(200, text=TEAMTAILOR_RSS)
+
+    android, security = teamtailor.fetch(make_client(handler), {"company": "nutrium", "name": "Nutrium"})
+    assert seen == ["https://nutrium.teamtailor.com/jobs.rss"]  # one request, descriptions included
+    assert (android.uid, android.company, android.location) == ("teamtailor:nutrium:8543944", "Nutrium", "Braga")
+    assert (android.posted_at, android.work_model) == ("2026-10-14", "remote")
+    assert android.url == "https://careers.nutrium.com/jobs/8543944-android-developer"
+    assert android.description == "Welcome to Nutrium.\nKotlin and Jetpack Compose"
+    assert (security.location, security.work_model) == ("", "hybrid")  # no city: the filters look in the text
+
+
+def test_teamtailor_on_its_own_domain(make_client):
+    seen = []
+    teamtailor.fetch(make_client(lambda r: seen.append(str(r.url)) or httpx.Response(200, text="<rss></rss>")),
+                     {"company": "criticaltechworks", "url": "https://join.criticaltechworks.com/"})
+    assert seen == ["https://join.criticaltechworks.com/jobs.rss"]
+
+
+# --- Balanças Marques --------------------------------------------------------
+
+def _card(slug, title):
+    return (f'<button type="button" class="job-share" data-url="/vagas/{slug}/" data-title="{title}" '
+            f'aria-label="Partilhar oferta"><img src="/share.svg"></button>'
+            f'<a href="/vagas/{slug}/" class="card red job-cover-card"><div class="job-card-media"></div></a>')
+
+
+BM_LIST = (_card("agentic-development-engineer", "Agentic Development Engineer (AI-Native Engineering)")
+           + _card("serralheiro", "Serralheiros/Soldadores") + _card("candidaturaespontanea", "Candidatura Espontânea"))
+
+
+def _meta(label, value):
+    return (f'<div class="job-meta-item"><span class="job-meta-label">{label}</span>\n'
+            f'    <span class="job-meta-value">{value}                            </span></div>')
+
+
+BM_DETAIL = ('<div class="search-box"><form action="/pesquisa" method="get"></form></div>'
+             '<h1>Agentic Development Engineer (AI-Native Engineering)  </h1>'
+             '<button type="button" class="job-share1"><span>Partilhar</span></button><div class="job-meta">'
+             + _meta("Empresa", "SDILAB") + _meta("Data", "2026-09-28") + _meta("Refer&ecirc;ncia", "SDI-AINE-2026")
+             + _meta("Regime", "Full time | Presencial") + _meta("Pa&iacute;s", "Portugal") + _meta("Cidade", "Braga")
+             + '</div><div class="value-content"><h2>Quem somos</h2><p>Somos a software house que desenvolve o ETPOS.</p></div>'
+             '<button type="button" class="job-share1 job-social-share"><span>Partilhar</span></button>'
+             '<div id="contacts"><h6><b>FORMULÁRIO DE CANDIDATURA</b></h6><form class="ajax-submit"></form></div>')
+
+
+def test_balancasmarques_list_and_detail(make_client):
+    seen = []
+
+    def handler(request):
+        seen.append(request.url.path)
+        return httpx.Response(200, text=BM_LIST if request.url.path == "/recrutamento" else BM_DETAIL)
+
+    jobs = balancasmarques.fetch(make_client(handler), {}, prefilter=lambda job: "Engineer" in job.title)
+    assert [j.title for j in jobs] == ["Agentic Development Engineer (AI-Native Engineering)", "Serralheiros/Soldadores"]
+    assert seen == ["/recrutamento", "/vagas/agentic-development-engineer/"]  # no page for the welders
+    job = jobs[0]
+    assert (job.uid, job.company, job.location) == ("balancasmarques:agentic-development-engineer", "SDILAB", "Braga")
+    assert (job.posted_at, job.contract, job.work_model) == ("2026-09-28", "Full time", "on-site")
+    assert job.url == "https://www.balancasmarques.com/vagas/agentic-development-engineer/"
+    assert job.description == "Quem somos\nSomos a software house que desenvolve o ETPOS."
+    assert jobs[1].company == "Balanças Marques"  # list data only, until the detail says otherwise

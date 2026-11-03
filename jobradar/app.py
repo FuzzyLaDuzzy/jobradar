@@ -17,11 +17,12 @@ from pydantic import BaseModel, Field, field_validator
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from . import config as config_mod
-from . import gemini, i18n, message, profile, scoring, skills
+from . import discover, gemini, i18n, message, profile, scoring, skills
 from .i18n import t
 from .db import STATUSES, Database
 from .models import Job
 from .refresh import run_refresh
+from .sources import make_client
 
 STATIC = Path(__file__).parent / "static"
 # The names JobRadar answers to. A site whose domain is pointed at 127.0.0.1 (DNS rebinding)
@@ -111,6 +112,25 @@ class ProfileBody(BaseModel):
         return items
 
 
+class CompanyBody(BaseModel):
+    company: str = Field(min_length=1, max_length=200)
+
+
+class SourceBody(BaseModel):
+    """A company to follow, as discover.entry() made it: a platform and a few short fields."""
+
+    kind: str
+    entry: dict[str, str]
+
+    @field_validator("entry")
+    @classmethod
+    def _plain(cls, entry: dict[str, str]) -> dict[str, str]:
+        allowed = {"company", "name", "site", "country"}
+        if not entry or set(entry) - allowed or any(not v.strip() or len(v) > 200 or "\n" in v for v in entry.values()):
+            raise ValueError(t("entrada inválida"))
+        return {k: v.strip() for k, v in entry.items()}
+
+
 class CvBody(BaseModel):
     pdf: str = Field(max_length=MAX_CV_BYTES * 4 // 3 + 4)  # base64 of a PDF of up to 5 MB
 
@@ -192,6 +212,35 @@ def create_app(
         if job is None:
             raise HTTPException(404, t("Vaga não encontrada"))
         return {"text": with_ai(lambda cfg: generate(job, cfg, llm_client))}
+
+    @app.post("/api/discover")
+    def discover_company(body: CompanyBody):
+        """Looks for one company's careers site on the platforms with a public API (a few seconds)."""
+        try:
+            cfg = config_mod.load(config_path)
+        except config_mod.ConfigError as exc:
+            raise HTTPException(400, t("Configuração inválida: {error}", error=exc)) from exc
+        name = body.company.strip()
+        if discover._key(name) in discover.followed(cfg):
+            return {"company": name, "followed": True, "found": []}
+        search = cfg.get("search") or {}
+        places = search.get("locations_primary") or search.get("locations") or []
+        with make_client() as client:
+            hits = discover.probe(client, name, pause=0.3, places=places)
+        return {"company": name, "followed": False, "found": [
+            {"platform": kind, "slug": slug, "jobs": jobs, "place": place.title() if place else None,
+             "entry": discover.entry(kind, name, slug)}
+            for _, kind, slug, jobs, place in hits]}
+
+    @app.post("/api/sources")
+    def follow_company(body: SourceBody):
+        if body.kind not in discover.ENTRIES:
+            raise HTTPException(400, t("A app ainda não lê esta plataforma."))
+        try:
+            config_mod.add_source(body.kind, body.entry, config_path)
+        except config_mod.ConfigError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        return {"ok": True}
 
     @app.get("/api/market")
     def get_market():

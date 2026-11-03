@@ -3,7 +3,7 @@ const { createApp } = Vue;
 const STORAGE_KEY = "jobradar.filters";
 const SOURCE_NAMES = {
   itjobs: "ITJobs", sysmatch: "Sysmatch", landingjobs: "Landing.jobs", netempregos: "Net-Empregos", randstad: "Randstad",
-  manual: "Adicionada por ti",
+  manual: "Adicionada por ti", balancasmarques: "Balanças Marques",
 };
 const WORK_MODELS = { remote: "Remoto", hybrid: "Híbrido", "on-site": "Presencial", onsite: "Presencial" };
 const EMPTY_JOB = () => ({ title: "", company: "", url: "", location: "", notes: "" });
@@ -193,6 +193,23 @@ const EN = {
   "Em «API keys», carrega em «Create Key» e copia a chave.": "Under “API keys”, press “Create Key” and copy the key.",
   "Cola-a aqui e, no ⚙, muda scoring.llm.provider para anthropic.":
     "Paste it here and, with ⚙, change scoring.llm.provider to anthropic.",
+  // ＋ follow a company
+  "＋ Seguir empresa": "＋ Follow company",
+  "Procurar o site de carreiras da {company} e receber as vagas dela diretamente":
+    "Find {company}'s careers site and get its jobs straight from there",
+  "Seguir {company}": "Follow {company}",
+  "Procuro o site de carreiras da empresa em 10 plataformas com API pública. Se a app o souber ler, passas a receber as vagas dela diretamente, com a descrição completa.":
+    "I look for the company's careers site on 10 platforms with a public API. If the app can read it, you get its jobs straight from there, with the full description.",
+  "A procurar… (uns segundos)": "Looking… (a few seconds)",
+  "Já segues esta empresa.": "You already follow this company.",
+  "Não encontrei a {company} em nenhuma das plataformas. As vagas dela continuam a chegar pelos sites de emprego.":
+    "I didn't find {company} on any of the platforms. Its jobs keep coming through the job boards.",
+  "menciona {place}": "mentions {place}",
+  "Seguir": "Follow",
+  "A app ainda não lê esta plataforma.": "The app doesn't read this platform yet.",
+  "Não foi possível procurar: {error}": "Couldn't look it up: {error}",
+  "A {company} passa a ser lida na próxima procura.": "{company} will be read on the next search.",
+  "Não foi possível seguir: {error}": "Couldn't follow it: {error}",
   // 📊 market
   "Mercado": "Market",
   "O que as vagas pedem": "What the jobs ask for",
@@ -262,6 +279,13 @@ function loadFilters() {
 }
 
 const PROFILE_SEEN_KEY = "jobradar.profileSeen";
+// sources that list other companies' jobs by the company's name: their cards offer "Follow company"
+// (not Sysmatch or Randstad: they are agencies and their jobs name the agency, never the client)
+const FOLLOWABLE = new Set(["itjobs", "landingjobs", "netempregos", "manual"]);
+const PLATFORM_NAMES = {
+  smartrecruiters: "SmartRecruiters", lever: "Lever", bamboohr: "BambooHR", recruitee: "Recruitee",
+  greenhouse: "Greenhouse", workable: "Workable", ashby: "Ashby", personio: "Personio", breezy: "Breezy HR", teamtailor: "Teamtailor",
+};
 const MAX_CV_BYTES = 5 * 1024 * 1024;
 const ITEM_LISTS = ["education", "projects", "experience"];
 
@@ -338,6 +362,8 @@ createApp({
       newKeys: EMPTY_KEYS(),
       keysError: "",
       savingKeys: false,
+      follow: { open: false, company: "", busy: false, saving: false, followed: false, found: [], error: "" },
+      justFollowed: [],
       marketOpen: false,
       market: { jobs: 0, skills: [] },
       marketMissingOnly: false,
@@ -597,6 +623,41 @@ createApp({
       }
       const data = await this.api("/api/profile").catch(() => null);
       if (data && data.example) this.openProfile(data);
+    },
+
+    // Jobs from job boards and agencies (or added by hand) name a company the app may not follow yet.
+    canFollow(job) {
+      return !!job.company && FOLLOWABLE.has(job.source.split(":")[0]) && !this.justFollowed.includes(job.company);
+    },
+
+    async findCompany(company) {
+      this.follow = { open: true, company, busy: true, saving: false, followed: false, found: [], error: "" };
+      try {
+        const { followed, found } = await this.api("/api/discover", { method: "POST", body: JSON.stringify({ company }) });
+        Object.assign(this.follow, { followed, found });
+      } catch (e) {
+        this.follow.error = this.t("Não foi possível procurar: {error}", { error: e.message });
+      } finally {
+        this.follow.busy = false;
+      }
+    },
+
+    async followCompany(hit) {
+      this.follow.saving = true;
+      try {
+        await this.api("/api/sources", { method: "POST", body: JSON.stringify({ kind: hit.platform, entry: hit.entry }) });
+        this.justFollowed.push(this.follow.company);
+        this.follow.open = false;
+        this.showToast(this.t("A {company} passa a ser lida na próxima procura.", { company: this.follow.company }));
+      } catch (e) {
+        this.follow.error = this.t("Não foi possível seguir: {error}", { error: e.message });
+      } finally {
+        this.follow.saving = false;
+      }
+    },
+
+    platformName(platform) {
+      return PLATFORM_NAMES[platform] || platform;
     },
 
     async openMarket() {

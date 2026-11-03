@@ -186,7 +186,7 @@ def update(changes: dict[tuple[str, str], object], path: Path | str = DEFAULT_CO
             elif value not in ("", [], None):  # an empty field doesn't add a line
                 added.append(" " * indent + _render(key, value, indent))
         if added:
-            end = mapping.value[-1][1].end_mark.index
+            end = _value_end(mapping)
             at_line_start = text[end - 1] == "\n"
             edits.append((end, end, ("" if at_line_start else "\n") + "\n".join(added) + ("\n" if at_line_start else "")))
     for start, end, new in sorted(edits, reverse=True):
@@ -195,6 +195,54 @@ def update(changes: dict[tuple[str, str], object], path: Path | str = DEFAULT_CO
     for (section, key), value in changes.items():  # what YAML reads back must be what was asked
         if not _same((cfg.get(section) or {}).get(key), value):
             raise ConfigError(t("Não foi possível gravar {field}: confirma o valor.", field=f"{section}.{key}"))
+    return save_text(text, path)
+
+
+def _value_end(node: yaml.Node) -> int:
+    """Where a value's text ends. A block mapping or list "ends" where the next key starts, so
+    go down to its last written value; a | block's end includes its line break."""
+    while isinstance(node, (yaml.MappingNode, yaml.SequenceNode)) and node.value and not node.flow_style:
+        node = node.value[-1][1] if isinstance(node, yaml.MappingNode) else node.value[-1]
+    return node.end_mark.index
+
+
+def _entry_lines(entry: dict, dash: int) -> list[str]:
+    """One list item in block style: "- first: value" at column `dash`, the other keys under it."""
+    lines = [f"{' ' * (dash + 2)}{key}: {_scalar(str(value))}" for key, value in entry.items()]
+    return [" " * dash + "- " + lines[0].lstrip()] + lines[1:] if lines else []
+
+
+def source_text(kind: str, entry: dict) -> str:
+    """The lines to follow one company, as `discover` prints them for config.yaml."""
+    return "\n".join([f"  {kind}:", *_entry_lines(entry, 4)])
+
+
+def add_source(kind: str, entry: dict, path: Path | str = DEFAULT_CONFIG) -> dict:
+    """Follow one more company: its entry goes at the end of `sources.<kind>` (or a new `<kind>:` at the
+    end of `sources`). Like update(), every other character of config.yaml stays as it was."""
+    text = read_text(path)
+    root = yaml.compose(text)
+    sections = {k.value: v for k, v in root.value} if isinstance(root, yaml.MappingNode) else {}
+    sources = sections.get("sources")
+    if not isinstance(sources, yaml.MappingNode) or sources.flow_style or not sources.value:
+        raise ConfigError(t("Não foi possível gravar: a secção '{section}' do config.yaml tem um formato "
+                            "que a app não sabe editar. Edita-a no ⚙.", section="sources"))
+    current = {k.value: v for k, v in sources.value}
+    items = current.get(kind)
+    if isinstance(items, yaml.SequenceNode) and not items.flow_style and items.value:
+        dash = items.value[0].start_mark.column - 2  # "    - company: ..." : the dash is 2 before the item
+        end, new = _value_end(items), _entry_lines(entry, dash)
+    elif kind not in current:
+        indent = sources.value[0][0].start_mark.column
+        end, new = _value_end(sources), [f"{' ' * indent}{kind}:", *_entry_lines(entry, indent + 2)]
+    else:
+        raise ConfigError(t("Não foi possível gravar: a secção '{section}' do config.yaml tem um formato "
+                            "que a app não sabe editar. Edita-a no ⚙.", section=f"sources.{kind}"))
+    at_line_start = text[end - 1] == "\n"
+    text = text[:end] + ("" if at_line_start else "\n") + "\n".join(new) + ("\n" if at_line_start else "") + text[end:]
+    cfg = parse(text)
+    if ((cfg.get("sources") or {}).get(kind) or [None])[-1] != entry:  # what YAML reads back must be the entry
+        raise ConfigError(t("Não foi possível gravar {field}: confirma o valor.", field=f"sources.{kind}"))
     return save_text(text, path)
 
 

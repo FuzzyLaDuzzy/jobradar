@@ -157,6 +157,8 @@
         <button class="btn" :class="{ on: j.status === 'guardada' }" @click="setStatus(j, 'guardada')">{{ t('★ Guardar') }}</button>
         <button class="btn" :class="{ on: j.status === 'candidatei' }" @click="setStatus(j, 'candidatei')">{{ t('✓ Candidatei-me') }}</button>
         <button class="btn ghost" :class="{ on: j.status === 'descartada' }" @click="setStatus(j, 'descartada')">{{ t('✕ Descartar') }}</button>
+        <button class="btn ghost" v-if="canFollow(j)" @click="findCompany(j.company)"
+                :title="t('Procurar o site de carreiras da {company} e receber as vagas dela diretamente', { company: j.company })">{{ t('＋ Seguir empresa') }}</button>
       </div>
     </article>
   </main>
@@ -179,6 +181,29 @@
         <button class="btn" @click="settingsOpen = false">{{ t('Cancelar') }}</button>
         <button class="btn primary" @click="saveConfig" :disabled="savingConfig">{{ t('Guardar') }}</button>
       </footer>
+    </div>
+  </div>
+
+  <div class="modal" v-if="follow.open" @click.self="follow.open = false">
+    <div class="sheet form follow" role="dialog" :aria-label="t('Seguir {company}', { company: follow.company })">
+      <header>
+        <h2>＋ {{ t('Seguir {company}', { company: follow.company }) }}</h2>
+        <button type="button" class="btn icon" @click="follow.open = false" :aria-label="t('Fechar')">✕</button>
+      </header>
+      <p class="muted small">{{ t('Procuro o site de carreiras da empresa em 10 plataformas com API pública. Se a app o souber ler, passas a receber as vagas dela diretamente, com a descrição completa.') }}</p>
+      <p v-if="follow.busy"><span class="spinner"></span> {{ t('A procurar… (uns segundos)') }}</p>
+      <template v-else>
+        <p v-if="follow.followed">{{ t('Já segues esta empresa.') }}</p>
+        <p v-else-if="!follow.error && !follow.found.length">{{ t('Não encontrei a {company} em nenhuma das plataformas. As vagas dela continuam a chegar pelos sites de emprego.', { company: follow.company }) }}</p>
+        <ul class="found">
+          <li v-for="h in follow.found" :key="h.platform + h.slug">
+            <span><strong>{{ platformName(h.platform) }}</strong> · {{ t('{n} vagas', { n: h.jobs }) }}<template v-if="h.place"> · {{ t('menciona {place}', { place: h.place }) }}</template></span>
+            <button v-if="h.entry" type="button" class="btn primary" :disabled="follow.saving" @click="followCompany(h)">{{ t('Seguir') }}</button>
+            <span v-else class="muted small">{{ t('A app ainda não lê esta plataforma.') }}</span>
+          </li>
+        </ul>
+        <p class="alert" v-if="follow.error">{{ follow.error }}</p>
+      </template>
     </div>
   </div>
 

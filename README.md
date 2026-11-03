@@ -32,6 +32,9 @@ Out of the box ([`config.example.yaml`](config.example.yaml)) it reads these job
 | **Mercedes-Benz.io** | Lisbon, Braga (hybrid) | Recruitee |
 | **Edigma** | Braga, Lisbon | Zoho Recruit |
 | **Eurotux** | Braga | Its jobs page |
+| **Balanças Marques** and **SDILAB** (same group) | Braga | Their jobs page |
+| **Nutrium** | Braga | Teamtailor |
+| **Coverflex** | Braga, Milan, Munich | Teamtailor |
 | **Euronext** (not in the example: no jobs in Braga) | Porto, Lisbon | Workday |
 
 When the same job shows up on two of them (a company's own page and ITJobs, say), it's one card with a link to each.
@@ -43,13 +46,14 @@ LinkedIn, Indeed and Glassdoor are left out on purpose (see [Limitations](#limit
 - **Reads many sources** through the public APIs and feeds that the sites themselves publish:
   - **ITJobs.pt**, the main Portuguese IT job board (free read-only key)
   - **Landing.jobs**, **Net-Empregos** and **Randstad**, through their official feeds
-  - **Sysmatch** and **Eurotux**, from their jobs pages
-  - **Company careers sites** on SmartRecruiters, Lever, Workday, SAP SuccessFactors, BambooHR, Recruitee and Zoho Recruit (Bosch, Farfetch, Accenture, Deloitte, EY, Fujitsu, Mercedes-Benz.io, Edigma… or any company you add)
+  - **Sysmatch**, **Eurotux** and **Balanças Marques** (with SDILAB), from their jobs pages
+  - **Company careers sites** on SmartRecruiters, Lever, Workday, SAP SuccessFactors, BambooHR, Recruitee, Zoho Recruit and Teamtailor (Bosch, Farfetch, Accenture, Deloitte, EY, Fujitsu, Mercedes-Benz.io, Edigma, Nutrium… or any company you add)
 - **Filters** by your area, the kind of job (words the title must have), your level (junior words, senior words to skip), excluded words and companies, job age and typical scam signs. When a source doesn't say where the job is, it looks for the city in the description.
 - **Scores each job from 0 to 100** from keywords (level, area, your skills and interests), with a penalty for jobs that ask for 3+ years. With an AI key, an LLM also scores each new job against your profile and writes one sentence on why.
 - **Your profile from your CV** (👤): drop your CV (PDF) and the AI fills in your name, contacts, skills, education, projects, experience and the jobs you're after; check and fix anything before saving, or fill it in by hand. Everything lands in `config.yaml`, which the score, the messages and the interview prep use.
 - **Writes a draft application message** (✉) in the posting's language, using only the facts in your profile, and honest about what you're missing.
 - **Prepares you for the interview** (🎯): what the job is looking for, likely technical and behavioural questions with hints from your profile, your gaps against the posting, and questions to ask the company.
+- **Follows a company in one click** (＋): on a job from a job board, **＋ Follow company** looks for that company's careers site on ten platforms and, if JobRadar can read it, adds it to your sources, so its jobs come straight from the company with the full description.
 - **Shows what the jobs ask for** (📊 Market): the skills most asked for in the jobs it found, and which ones your profile already has, so you know what to learn next.
 - **Tracks your applications**: mark jobs as saved, applied (with the date) or discarded, and keep notes apart from the description. Jobs you find elsewhere (LinkedIn, a friend…) can be added by hand.
 - **Spots jobs that closed**: when a job disappears from its source, it's marked as no longer published.
@@ -128,12 +132,14 @@ Without keys, every source except ITJobs works, and scores use keywords only. Wi
 
 ### Find the companies in your area
 
+The quickest way is in the app: on a job from ITJobs, Landing.jobs or Net-Empregos, press **＋ Follow company**. From the terminal, to look up many at once:
+
 ```bash
 python -m jobradar discover                         # companies already seen in your area
 python -m jobradar discover "Company A" "Company B" # plus these names
 ```
 
-It takes the companies that already showed up with jobs in your area (plus any names you give), checks nine careers platforms with a public API (BambooHR, Lever, SmartRecruiters, Greenhouse, Workable, Ashby, Recruitee, Personio, Breezy), says whether the answer mentions your place, and prints the lines to add to `config.yaml`. Watch out for short names: they may match another company with the same name.
+It takes the companies that already showed up with jobs in your area (plus any names you give), checks ten careers platforms with a public API (BambooHR, Lever, SmartRecruiters, Greenhouse, Workable, Ashby, Recruitee, Personio, Breezy, Teamtailor), says whether the answer mentions your place, and prints the lines to add to `config.yaml`. Watch out for short names: they may match another company with the same name.
 
 To add a company by hand, open one of its job pages and look at the domain of the apply link:
 
@@ -146,6 +152,7 @@ To add a company by hand, open one of its job pages and look at the domain of th
 | BambooHR | `<site>.bamboohr.com/careers` | `- name: Uphold`<br>`  site: uphold` |
 | Recruitee | `<company>.recruitee.com` (the apply links say which) | `- company: mbio`<br>`  name: Mercedes-Benz.io` |
 | Zoho Recruit | careers pages ending in `/jobs/Careers` | `- name: Edigma`<br>`  url: https://careers.edigma.com/jobs/Careers` |
+| Teamtailor | `<company>.teamtailor.com`; a site on its own domain also works (`url:`) | `- company: nutrium`<br>`  name: Nutrium` |
 
 ## Run it automatically
 

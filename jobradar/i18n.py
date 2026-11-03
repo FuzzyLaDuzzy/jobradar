@@ -47,6 +47,8 @@ EN = {
     "Estado inválido. Usa: {options}": "Invalid status. Use: {options}",
     "Já há uma atualização a correr.": "A refresh is already running.",
     "Pedido recusado: vem de outro site.": "Request refused: it comes from another site.",
+    "entrada inválida": "invalid entry",
+    "A app ainda não lê esta plataforma.": "The app doesn't read this platform yet.",
     "a chave só pode ter letras, números, '-', '_' e '.'": "a key can only have letters, numbers, '-', '_' and '.'",
     # gemini.py, message.py
     "Atingiste o limite do plano gratuito do Gemini. Tenta daqui a uns minutos.":

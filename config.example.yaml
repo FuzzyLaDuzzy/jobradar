@@ -86,7 +86,10 @@ sources:
   eurotux:                    # eurotux.com/careers
     - company: Eurotux
       logo: https://www.google.com/s2/favicons?domain=eurotux.com&sz=128
-  zohorecruit:                # Zoho Recruit careers sites (careers.<company>.../jobs/Careers)
+  balancasmarques:            # balancasmarques.com/recrutamento, also SDILAB's jobs (same group)
+    - company: Balanças Marques
+      logo: https://www.google.com/s2/favicons?domain=balancasmarques.com&sz=128
+  zohorecruit:               # Zoho Recruit careers sites (careers.<company>.../jobs/Careers)
     - name: Edigma
       url: https://careers.edigma.com/jobs/Careers
       logo: https://www.google.com/s2/favicons?domain=edigma.com&sz=128
@@ -94,6 +97,13 @@ sources:
     - company: mbio
       name: Mercedes-Benz.io  # offices in Lisbon and Braga
       logo: https://www.google.com/s2/favicons?domain=mercedes-benz.io&sz=128
+  teamtailor:                 # https://<company>.teamtailor.com (or `url:` for a site on its own domain)
+    - company: nutrium
+      name: Nutrium
+      logo: https://www.google.com/s2/favicons?domain=nutrium.com&sz=128
+    - company: coverflex
+      name: Coverflex
+      logo: https://www.google.com/s2/favicons?domain=coverflex.com&sz=128
   # Large companies with offices in several cities. Each searches your primary places
   # unless the entry sets its own `search` (Workday) or `location` (SuccessFactors).
   smartrecruiters:            # https://jobs.smartrecruiters.com/<company>

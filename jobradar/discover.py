@@ -3,6 +3,9 @@ with a public API, and print the config.yaml lines to follow them.
 
     python -m jobradar descobrir                  # companies already seen in your area
     python -m jobradar descobrir Uphold "F3M"     # plus these names
+
+The app's "Follow this company" button (on a job from a job board) uses probe() and entry()
+for one company, and config.add_source() to follow it.
 """
 
 from __future__ import annotations
@@ -32,15 +35,29 @@ PROBES = {
     "recruitee": ("https://{slug}.recruitee.com/api/offers/", lambda r: len(r.json().get("offers") or [])),
     "personio": ("https://{slug}.jobs.personio.de/xml", lambda r: r.text.count("<position>")),
     "breezy": ("https://{slug}.breezy.hr/json", lambda r: len(r.json()) if isinstance(r.json(), list) else 0),
+    "teamtailor": ("https://{slug}.teamtailor.com/jobs.rss", lambda r: r.text.count("<item>")),
 }
-# platforms JobRadar already reads: the entry to paste under `sources:` in config.yaml
-CONFIG = {
-    "bamboohr": "  bamboohr:\n    - name: {name}\n      site: {slug}",
-    "lever": "  lever:\n    - site: {slug}\n      company: {name}",
-    "smartrecruiters": "  smartrecruiters:\n    - company: {slug}\n      country: pt",
-    "recruitee": "  recruitee:\n    - company: {slug}\n      name: {name}",
+# platforms JobRadar already reads: their entry under `sources:` in config.yaml
+ENTRIES = {
+    "bamboohr": lambda name, slug: {"name": name, "site": slug},
+    "lever": lambda name, slug: {"site": slug, "company": name},
+    "smartrecruiters": lambda name, slug: {"company": slug, "country": "pt"},
+    "recruitee": lambda name, slug: {"company": slug, "name": name},
+    "teamtailor": lambda name, slug: {"company": slug, "name": name},
 }
 _SUFFIXES = {"lda", "sa", "s", "a", "unipessoal", "portugal", "pt", "group", "grupo"}
+
+
+def entry(platform: str, name: str, slug: str) -> dict | None:
+    """The config entry to follow this company, or None if JobRadar doesn't read that platform yet."""
+    make = ENTRIES.get(platform)
+    return make(name, slug) if make else None
+
+
+def followed(cfg: dict) -> set[str]:
+    """Every name and id already in `sources`, as _key()s: those companies are followed already."""
+    return {_key(v) for entries in (cfg.get("sources") or {}).values() for e in entries or []
+            for v in e.values() if isinstance(v, str)}
 
 
 def _key(name: str) -> str:
@@ -84,8 +101,9 @@ def probe(client: httpx.Client, name: str, pause: float, places: list[str] = ())
 
 def run(cfg: dict, db: Database, client: httpx.Client, extra=(), pause: float = 0.3,
         out: Callable[[str], None] = print) -> list[tuple]:
-    known = {_key(v) for entries in (cfg.get("sources") or {}).values() for e in entries or []
-             for v in e.values() if isinstance(v, str)}
+    from .config import source_text
+
+    known = followed(cfg)
     search = cfg.get("search") or {}
     places = search.get("locations_primary") or search.get("locations") or []
     names = sorted(set(companies_in_area(db, search, known)) | set(extra))
@@ -98,9 +116,9 @@ def run(cfg: dict, db: Database, client: httpx.Client, extra=(), pause: float = 
             where = t(", menciona {place}", place=place.title()) if place else ""
             head = t("{name}: {platform}/{slug} ({jobs} vagas{where}).", name=name, platform=kind, slug=slug,
                      jobs=jobs, where=where)
-            if kind in CONFIG:
+            if entry(kind, name, slug):
                 out(f"\n{head} " + t("Para a seguir, acrescenta às `sources` do config.yaml:")
-                    + f"\n{CONFIG[kind].format(name=name, slug=slug)}")
+                    + f"\n{source_text(kind, entry(kind, name, slug))}")
             else:
                 out(f"\n{head} " + t("O JobRadar ainda não lê esta plataforma."))
             found.append(hit)
