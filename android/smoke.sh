@@ -8,13 +8,23 @@ exec > >(tee smoke.log) 2>&1
 apk=$(ls android/bin/*.apk | head -1)
 echo "apk: $apk ($(du -h "$apk" | cut -f1))"
 adb install -r "$apk"
-adb shell am start -n io.github.fuzzyladuzzy.jobradar/org.kivy.android.PythonActivity
 adb forward tcp:8000 tcp:8000
+pkg=io.github.fuzzyladuzzy.jobradar
+# a freshly booted emulator still settles for a while; Android relaunching the window while the app
+# unpacks its files ends the app (seen in CI, not on a phone), so wait a little and allow one restart
+sleep 10
+adb shell am start -n $pkg/org.kivy.android.PythonActivity
 
 status=1
+restarted=no
 for _ in $(seq 1 90); do
   url=$(adb logcat -d | grep -o "Opening URL: http://127.0.0.1:8000/?k=[A-Za-z0-9_-]*" | tail -1 | cut -d' ' -f3)
   if [ -n "$url" ]; then status=0; break; fi
+  if [ "$restarted" = no ] && [ -z "$(adb shell pidof $pkg | tr -d '\r')" ]; then
+    echo "the app ended before opening its window: starting it once more"
+    restarted=yes
+    adb shell am start -n $pkg/org.kivy.android.PythonActivity
+  fi
   sleep 3
 done
 check() { echo "$1"; [ "$2" = "$3" ] || { echo "  expected $3, got $2"; status=1; }; }
@@ -33,7 +43,6 @@ adb logcat -d > logcat.txt
 pid=$(adb shell pidof io.github.fuzzyladuzzy.jobradar | tr -d '\r')
 echo "--- the app's process: ${pid:-none (it died)}"
 echo "--- Python, the app's Java, and crashes:"
-pkg=io.github.fuzzyladuzzy.jobradar
 # the app's own lines, crashes, and Android saying why it ended the app (not the system's other noise)
 grep -E " python *:|PythonActivity|WebViewLoader|JobRadar|AndroidRuntime|FATAL|Fatal signal|DEBUG *: |chromium|$pkg" logcat.txt \
   | grep -v "extracting " | tail -100
