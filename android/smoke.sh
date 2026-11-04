@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 # On the emulator: install the APK, open the app and check that its server answers, that the API
 # refuses other apps, and that the app's window got in with the key (read here from the log, which
-# only adb and the app itself can read). Leaves screen.png and logcat.txt for the CI artifacts.
+# only adb and the app itself can read). Leaves smoke.log (this script's output), screen.png and
+# logcat.txt for the CI artifacts.
 set -u
-adb install -r "$(ls android/bin/*.apk | head -1)"
+exec > >(tee smoke.log) 2>&1
+apk=$(ls android/bin/*.apk | head -1)
+echo "apk: $apk ($(du -h "$apk" | cut -f1))"
+adb install -r "$apk"
 adb shell am start -n io.github.fuzzyladuzzy.jobradar/org.kivy.android.PythonActivity
 adb forward tcp:8000 tcp:8000
 
@@ -25,5 +29,6 @@ else
 fi
 adb exec-out screencap -p > screen.png
 adb logcat -d > logcat.txt
-grep -E " python *:" logcat.txt | tail -60
+echo "--- Python, and Android errors:"
+grep -E " python *:|AndroidRuntime|FATAL| E PythonActivity| E WebViewLoader" logcat.txt | grep -v "extracting _python_bundle" | tail -80
 exit "$status"

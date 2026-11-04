@@ -98,13 +98,14 @@ jobs:
           arch: x86_64
           target: google_apis
           script: bash android/smoke.sh
-      - name: Put Python's output in annotations
+      - name: Put the test's output in annotations
         if: failure()
-        run: grep -E " python *:" logcat.txt > python.txt; bash android/annotate.sh python.txt logcat
+        run: bash android/annotate.sh smoke.log smoke
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: emulator
           path: |
+            smoke.log
             screen.png
             logcat.txt
