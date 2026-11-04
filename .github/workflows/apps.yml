@@ -164,11 +164,12 @@ jobs:
           python-version: "3.12"
           cache: pip
       - run: pip install -r requirements.txt pyinstaller==6.22.3
-      # uvicorn picks its parts by name at run time, so PyInstaller doesn't see them on its own
+      # uvicorn picks its parts by name at run time, so PyInstaller doesn't see them on its own; the page
+      # (jobradar/static) is named outright: --collect-data jobradar left it out on the runner
       - name: JobRadar.exe, with Python inside
         run: >-
           pyinstaller --noconfirm --windowed --name JobRadar --icon jobradar/static/icon.ico --paths .
-          --collect-data jobradar --collect-submodules uvicorn --add-data "config.example.yaml;." windows/start.py
+          --add-data "jobradar/static;jobradar/static" --collect-submodules uvicorn --add-data "config.example.yaml;." windows/start.py
       - name: The installer
         run: |
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"

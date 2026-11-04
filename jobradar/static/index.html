@@ -47,7 +47,12 @@
   </header>
 
   <section class="sources" v-if="runs.length">
-    <div v-for="r in runs" :key="r.source" class="source-chip" :class="[r.status, { broken: brokenSources.has(r.source) }]">
+    <button class="sources-summary" @click="sourcesOpen = !sourcesOpen" :aria-expanded="sourcesOpen">
+      {{ t('{n} fontes', { n: runs.length }) }} · {{ t('{kept} relevantes de {fetched}', { kept: runTotals.kept, fetched: runTotals.fetched }) }}<b v-if="runTotals.new">{{ t(' · {n} novas', { n: runTotals.new }) }}</b>
+      <span class="failing" v-if="runTotals.errors">· {{ t('{n} com erro', { n: runTotals.errors }) }}</span>
+      <span aria-hidden="true">{{ sourcesOpen ? '▴' : '▾' }}</span>
+    </button>
+    <div v-for="r in runs" v-show="sourcesOpen" :key="r.source" class="source-chip" :class="[r.status, { broken: brokenSources.has(r.source) }]">
       <span class="dot"></span>
       <strong>{{ sourceName(r.source) }}</strong>
       <span v-if="r.status === 'ok'">{{ t('{kept} relevantes de {fetched}', { kept: r.kept, fetched: r.fetched }) }}<b v-if="r.new">{{ t(' · {n} novas', { n: r.new }) }}</b></span>

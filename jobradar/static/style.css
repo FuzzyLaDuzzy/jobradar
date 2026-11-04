@@ -99,6 +99,13 @@ body {
 
 /* source status */
 .sources { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0 6px; }
+.sources-summary {
+  display: none; align-items: center; gap: 6px; flex-wrap: wrap; width: 100%; text-align: left;
+  border: 1px solid var(--border); background: var(--surface); color: var(--muted); border-radius: 10px;
+  padding: 8px 12px; font: inherit; font-size: 13.5px; cursor: pointer;
+}
+.sources-summary b { color: var(--accent); }
+.sources-summary .failing { color: var(--warn); }
 .source-chip {
   display: inline-flex; align-items: center; gap: 7px; max-width: 100%;
   background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
@@ -280,7 +287,7 @@ details textarea {
 .bar span { display: block; height: 100%; border-radius: 999px; background: var(--mid); }
 .bar span.have { background: var(--high); }
 .bar-count { color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
-@media (max-width: 720px) { .bars li { grid-template-columns: 1fr auto; } .bar { grid-column: 1 / -1; order: 3; } }
+@media (max-width: 720px) { .bars li { grid-template-columns: 1fr auto auto; } .bar { grid-column: 1 / -1; order: 3; } }
 
 /* 👤 profile */
 .sheet.profile { width: min(640px, 100%); }
@@ -338,5 +345,9 @@ details textarea.ai-text { min-height: 260px; }
   .top-icons { order: -1; gap: 8px; }
   .top-actions > .muted { order: 1; flex: 1 1 100%; }
   .tabs button { padding: 9px 9px 11px; }
+  .tabs { scrollbar-width: none; }  /* they still scroll sideways */
+  /* 20+ sources would fill the whole first screen: one line, the chips when tapped */
+  .sources-summary { display: flex; }
+  .sources { margin-top: 16px; }
   .source-chip .msg { max-width: 220px; }
 }

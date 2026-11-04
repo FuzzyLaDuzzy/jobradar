@@ -68,6 +68,8 @@ const EN = {
   "{kept} relevantes de {fetched}": "{kept} relevant of {fetched}",
   " · {n} novas": " · {n} new",
   "Erro: {error}": "Error: {error}",
+  "{n} fontes": "{n} sources",
+  "{n} com erro": "{n} with errors",
   "A IA está a avaliar as vagas novas…": "The AI is scoring the new jobs…",
   // tabs and toolbar
   "Estado das vagas": "Job status",
@@ -406,6 +408,7 @@ createApp({
       systemDark: window.matchMedia("(prefers-color-scheme: dark)").matches,
       jobs: [],
       runs: [],
+      sourcesOpen: !window.matchMedia("(max-width: 720px)").matches, // on a phone, one line until tapped
       cut: [], // ✂ what the filters cut in the last search, and why
       health: [], // sources that look broken
       cutReason: "",
@@ -524,6 +527,10 @@ createApp({
     },
     cutShown() {
       return this.cutFiltered.slice(0, this.cutLimit);
+    },
+    runTotals() {
+      const sum = (key) => this.runs.reduce((n, r) => n + (r[key] || 0), 0);
+      return { kept: sum("kept"), fetched: sum("fetched"), new: sum("new"), errors: this.runs.filter((r) => r.status === "error").length };
     },
     brokenSources() {
       return new Set(this.health.map((h) => h.source));
