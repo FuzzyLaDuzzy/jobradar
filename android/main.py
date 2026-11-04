@@ -31,6 +31,7 @@ from jobradar.i18n import t  # noqa: E402
 
 PORT = 8000
 window = autoclass("org.kivy.android.PythonActivity")
+autoclass("org.kivy.android.JobRadarFilePicker").install()  # "choose your CV" opens Android's picker
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
 logging.getLogger("httpx").setLevel(logging.WARNING)  # the ITJobs URL carries the api_key

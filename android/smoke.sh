@@ -23,6 +23,7 @@ if [ "$status" = 0 ]; then
   check "the API, from another app" "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8000/api/jobs)" 403
   check "the app's window opens with the key" "$(curl -s -c jar -o /dev/null -w '%{http_code}' "$url")" 303
   check "then the API answers" "$(curl -s -b jar http://127.0.0.1:8000/api/jobs)" "[]"
+  check "the CV's file chooser is set up" "$(adb logcat -d | grep -q 'file picker ready' && echo yes)" yes
   sleep 10  # the window switches from the loading screen to the app
 else
   echo "the app never opened its window"

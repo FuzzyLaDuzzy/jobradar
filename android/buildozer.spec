@@ -22,6 +22,8 @@ orientation = portrait
 fullscreen = 0
 
 android.permissions = INTERNET
+# Java added to the app: the file chooser for the CV (the window has none of its own)
+android.add_src = %(source.dir)s/java
 # 34, not 35: from 35 Android draws apps under the status bar, and the webview bootstrap doesn't leave room
 android.api = 34
 android.minapi = 24

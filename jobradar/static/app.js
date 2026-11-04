@@ -68,6 +68,7 @@ const EN = {
   "{kept} relevantes de {fetched}": "{kept} relevant of {fetched}",
   " · {n} novas": " · {n} new",
   "Erro: {error}": "Error: {error}",
+  "A IA está a avaliar as vagas novas…": "The AI is scoring the new jobs…",
   // tabs and toolbar
   "Estado das vagas": "Job status",
   "Todas": "All", "Novas": "New", "Guardadas": "Saved", "Candidaturas": "Applied", "Descartadas": "Discarded",
@@ -411,6 +412,7 @@ createApp({
       cutLimit: 100,
       loading: true,
       refreshing: false,
+      scoringNow: false, // the AI is scoring the last search's jobs
       error: "",
       tab: saved.tab || "todas",
       query: saved.query || "",
@@ -629,14 +631,28 @@ createApp({
       this.refreshing = true;
       this.error = "";
       try {
-        const { runs } = await this.api("/api/refresh", { method: "POST" });
+        const { runs, scoring } = await this.api("/api/refresh", { method: "POST" });
         const fresh = runs.reduce((n, r) => n + (r.new || 0), 0);
         await this.load();
         this.showToast(fresh ? this.t("{n} vagas novas encontradas", { n: fresh }) : this.t("Sem vagas novas desde a última procura"));
+        if (scoring) this.waitForScores();
       } catch (e) {
         this.error = e.message;
       } finally {
         this.refreshing = false;
+      }
+    },
+
+    // the AI scores the new jobs after the search answers: the list reloads when it's done
+    async waitForScores() {
+      this.scoringNow = true;
+      try {
+        while ((await this.api("/api/scoring")).running) await new Promise((r) => setTimeout(r, 4000));
+        await this.load();
+      } catch {
+        /* the scores show on the next reload */
+      } finally {
+        this.scoringNow = false;
       }
     },
 

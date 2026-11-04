@@ -26,7 +26,8 @@
       </div>
     </div>
     <div class="top-actions">
-      <span class="muted small" v-if="lastRefresh">{{ t('Atualizado {when}', { when: relative(lastRefresh) }) }}</span>
+      <span class="muted small" v-if="scoringNow"><span class="spinner"></span> {{ t('A IA está a avaliar as vagas novas…') }}</span>
+      <span class="muted small" v-else-if="lastRefresh">{{ t('Atualizado {when}', { when: relative(lastRefresh) }) }}</span>
       <button class="btn" @click="openMarket">📊 {{ t('Mercado') }}</button>
       <button class="btn" @click="openProfile()">👤 {{ t('Perfil') }}</button>
       <button class="btn" @click="openAddJob">{{ t('+ Adicionar vaga') }}</button>
@@ -246,7 +247,7 @@
               {{ c.label }}{{ c.default ? ' · ' + t('por omissão') : '' }}
             </option>
           </optgroup>
-          <optgroup :label="t('Claude (Anthropic, pago)')">
+          <optgroup :label="t('Claude (Anthropic, pago)')" v-if="ai.choices.some((c) => c.provider === 'anthropic')">
             <option v-for="c in ai.choices.filter((c) => c.provider === 'anthropic')" :key="c.id" :value="c.id">{{ c.label }}</option>
           </optgroup>
         </select>

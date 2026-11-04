@@ -217,7 +217,9 @@ def test_llm_scores_new_jobs(tmp_path, monkeypatch):
         "fetchers": {"smartrecruiters": lambda c, e, prefilter=None: list(JOBS)},
         "client": SimpleNamespace(), "llm_client": FakeLLM()})
     tc = TestClient(app)
-    tc.post("/api/refresh")
+    assert tc.post("/api/refresh").json()["scoring"] is True  # the search answers, the AI scores after
+    app.state.scorer.join(5)
+    assert tc.get("/api/scoring").json() == {"running": False}
     job = tc.get("/api/jobs").json()[0]
     assert job["llm_score"] == 90
     assert job["llm_reason"].startswith("Pede LLMs")

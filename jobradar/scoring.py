@@ -7,6 +7,7 @@ one-line reason; the final score then mixes both (40% keywords, 60% LLM).
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import re
@@ -49,7 +50,9 @@ def ai_choice(choice: str) -> dict | None:
 
 def ai_choices(gemini_models: list[str]) -> list[dict]:
     models = sorted({m for m in gemini_models if gemini.MODEL_RE.match(m)} | {PROVIDERS["gemini"][1]}, key=_gemini_order)
-    return [ai_choice(f"gemini:{m}") for m in models] + [ai_choice("anthropic")]
+    # Claude only where its package is installed (not in the phone app)
+    claude = [ai_choice("anthropic")] if importlib.util.find_spec("anthropic") else []
+    return [ai_choice(f"gemini:{m}") for m in models] + claude
 
 
 def current_choice(cfg: dict) -> str:

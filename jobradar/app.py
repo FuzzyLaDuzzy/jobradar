@@ -5,6 +5,7 @@ import csv
 import hashlib
 import hmac
 import io
+import logging
 import os
 import re
 import threading
@@ -27,7 +28,7 @@ from .db import STATUSES, Database
 from .filters import reason_label
 from .models import Job
 from .text import normalize
-from .refresh import run_refresh
+from .refresh import run_refresh, score_new
 from .sources import make_client, source_label
 
 STATIC = Path(__file__).parent / "static"
@@ -192,6 +193,21 @@ def _same(given: str | None, token: str) -> bool:
     return hmac.compare_digest((given or "").encode(), token.encode())  # in constant time
 
 
+def _claude_error(exc: Exception) -> None:
+    """The Anthropic API's errors as messages for the page. Imported only with Claude: the phone app
+    carries Gemini only, and importing anthropic there broke every AI button (error 500)."""
+    import anthropic
+
+    if isinstance(exc, anthropic.AuthenticationError):
+        raise HTTPException(400, t("A ANTHROPIC_API_KEY foi recusada. Confirma a chave no .env.")) from exc
+    if isinstance(exc, anthropic.RateLimitError):
+        raise HTTPException(429, t("Demasiados pedidos à API da Anthropic. Tenta daqui a um minuto.")) from exc
+    if isinstance(exc, anthropic.APIStatusError):
+        raise HTTPException(502, t("A API da Anthropic respondeu com o erro {code}.", code=exc.status_code)) from exc
+    if isinstance(exc, anthropic.APIConnectionError):
+        raise HTTPException(502, t("Sem ligação à API da Anthropic.")) from exc
+
+
 def key_status() -> dict[str, bool]:
     """Which keys are set: never their values."""
     return {key: bool(os.environ.get(key)) for key in config_mod.KEYS}
@@ -229,7 +245,26 @@ def create_app(
 
     db = Database(db_path)
     refresh_lock = threading.Lock()
+    scoring_lock = threading.Lock()
+    app.state.scorer = None  # the thread scoring the new jobs with the AI, after a search (tests wait on it)
     refresh_kwargs = refresh_kwargs or {}
+
+    def score_later(cfg: dict) -> None:
+        """The AI scores the new jobs after the search answers, one at a time as before: the list
+        shows them at once with their keyword score, and the AI's score comes in afterwards."""
+        if not scoring_lock.acquire(blocking=False):
+            return  # it is already scoring; the rest are scored after the next search
+
+        def work():
+            try:
+                score_new(cfg, db, refresh_kwargs.get("llm_client"))
+            except Exception:  # never let the AI break the app
+                logging.getLogger("jobradar").exception("A avaliação da IA falhou")
+            finally:
+                scoring_lock.release()
+
+        app.state.scorer = threading.Thread(target=work, daemon=True)
+        app.state.scorer.start()
 
     @app.get("/api/jobs")
     def list_jobs():
@@ -317,20 +352,14 @@ def create_app(
         if not os.environ.get(key_env):
             where = "aistudio.google.com" if key_env == "GEMINI_API_KEY" else "console.anthropic.com"
             raise HTTPException(400, t("Falta {key} no .env (cria a chave em {where}).", key=key_env, where=where))
-        import anthropic
-
         try:
             return call(cfg)
         except (message.MessageError, gemini.GeminiError) as exc:
             raise HTTPException(502, str(exc)) from exc
-        except anthropic.AuthenticationError as exc:
-            raise HTTPException(400, t("A ANTHROPIC_API_KEY foi recusada. Confirma a chave no .env.")) from exc
-        except anthropic.RateLimitError as exc:
-            raise HTTPException(429, t("Demasiados pedidos à API da Anthropic. Tenta daqui a um minuto.")) from exc
-        except anthropic.APIStatusError as exc:
-            raise HTTPException(502, t("A API da Anthropic respondeu com o erro {code}.", code=exc.status_code)) from exc
-        except anthropic.APIConnectionError as exc:
-            raise HTTPException(502, t("Sem ligação à API da Anthropic.")) from exc
+        except Exception as exc:
+            if scoring.llm_settings(cfg)["provider"] == "anthropic":
+                _claude_error(exc)
+            raise
 
     def ai_text(uid: str, generate) -> dict:
         """Runs one of the AI helpers (message.write or message.interview) for a job."""
@@ -445,11 +474,19 @@ def create_app(
             raise HTTPException(409, t("Já há uma atualização a correr."))
         try:
             cfg = config_mod.load(config_path)
-            return {"runs": run_refresh(cfg, db, **refresh_kwargs)}
+            runs = run_refresh(cfg, db, score=False, **refresh_kwargs)
+            if scoring.llm_available(cfg) or refresh_kwargs.get("llm_client") is not None:
+                score_later(cfg)
+            return {"runs": runs, "scoring": scoring_lock.locked()}
         except config_mod.ConfigError as exc:
             raise HTTPException(400, t("Configuração inválida: {error}", error=exc)) from exc
         finally:
             refresh_lock.release()
+
+    @app.get("/api/scoring")
+    def scoring_status():
+        """Whether the AI is still scoring the jobs of the last search (the list reloads when it's done)."""
+        return {"running": scoring_lock.locked()}
 
     @app.get("/api/runs")
     def runs():
