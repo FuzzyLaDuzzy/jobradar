@@ -55,6 +55,8 @@ def test_refresh_filters_stores_and_reports(client):
     assert runs["itjobs"]["status"] == "skipped"
     assert runs["lever:farfetch"]["status"] == "error"
     assert "network down" in runs["lever:farfetch"]["message"]
+    progress = client.get("/api/refresh/progress").json()  # the bar while it runs; here, after
+    assert progress == {"running": False, "total": len(runs), "done": len(runs), "waiting": []}
 
     jobs = client.get("/api/jobs").json()
     assert [j["title"] for j in jobs] == ["Junior AI Software Engineer"]

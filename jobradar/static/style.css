@@ -127,7 +127,7 @@ body {
 .health .muted { margin: 0; }
 
 /* tabs */
-.tabs { display: flex; gap: 4px; margin: 18px 0 12px; border-bottom: 1px solid var(--border); overflow-x: auto; }
+.tabs { display: flex; gap: 4px; margin: 18px 0 12px; border-bottom: 1px solid var(--border); overflow-x: auto; overflow-y: hidden; }
 .tabs button {
   border: 0; background: none; font: inherit; font-size: 14px; color: var(--muted); cursor: pointer;
   padding: 9px 12px 11px; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap;
@@ -183,11 +183,19 @@ body {
 .card.done { border-left: 3px solid var(--accent); }
 .card.rejected { border-left-color: var(--muted); opacity: .75; }
 
+/* the fit score: a ring that fills up to it (pathLength 100: the offset is 100 minus the score) */
 .score {
-  width: 50px; height: 50px; border-radius: 50%; display: grid; place-items: center;
-  font-weight: 700; font-size: 17px; font-variant-numeric: tabular-nums;
-  border: 3px solid currentColor; cursor: help;
+  position: relative; width: 50px; height: 50px; display: grid; place-items: center;
+  font-weight: 700; font-size: 17px; font-variant-numeric: tabular-nums; cursor: help;
 }
+.score svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.score circle { fill: none; stroke-width: 4; }
+.score .track { stroke: var(--surface-2); }
+.score .arc {
+  stroke: currentColor; stroke-linecap: round; stroke-dasharray: 100; stroke-dashoffset: var(--offset);
+  animation: ring-fill .9s cubic-bezier(.2, .7, .2, 1) both;
+}
+@keyframes ring-fill { from { stroke-dashoffset: 100; } }
 .score.high { color: var(--high); }
 .score.mid { color: var(--mid); }
 .score.low { color: var(--low); }
@@ -328,7 +336,38 @@ details textarea.ai-text { min-height: 260px; }
 .toast {
   position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
   background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 10px; font-size: 14px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, .18); z-index: 20;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .18); z-index: 20; animation: toast-in .25s ease-out;
+}
+@keyframes toast-in { from { opacity: 0; transform: translate(-50%, 12px); } }
+
+/* the search's progress */
+.progress { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 18px 0 2px; font-size: 13.5px; }
+.progress-bar { flex: 1 1 100%; height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.progress-bar div { height: 100%; border-radius: 999px; background: var(--accent); transition: width .4s ease; }
+
+/* the cards come in one after another (--i: their place, up to 12); one that leaves slides out and
+   the ones below move up */
+.cards { position: relative; }
+.card-enter-from { opacity: 0; transform: translateY(10px); }
+.card-enter-active { transition: opacity .3s ease, transform .3s ease; transition-delay: calc(var(--i, 0) * 30ms); }
+.card-leave-active { transition: opacity .2s ease, transform .2s ease; position: absolute; width: 100%; }
+.card-leave-to { opacity: 0; transform: translateX(28px); }
+.card-move { transition: transform .3s ease; }
+
+/* windows fade in; Description and Notes open smoothly where the browser can animate them */
+.modal { animation: fade-in .18s ease-out; }
+.modal > .sheet { animation: pop-in .22s cubic-bezier(.2, .8, .3, 1); }
+@keyframes fade-in { from { opacity: 0; } }
+@keyframes pop-in { from { opacity: 0; transform: translateY(8px) scale(.97); } }
+@supports (interpolate-size: allow-keywords) {
+  :root { interpolate-size: allow-keywords; }
+  details::details-content { height: 0; overflow: clip; transition: height .25s ease, content-visibility .25s allow-discrete; }
+  details[open]::details-content { height: auto; }
+}
+
+/* fewer animations for those who asked for less movement in their system */
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after { animation: none !important; transition: none !important; }
 }
 
 @media (max-width: 720px) {

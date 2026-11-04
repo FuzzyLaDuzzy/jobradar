@@ -51,3 +51,14 @@ def test_a_source_that_breaks_does_not_stop_the_others(tmp_path):
     runs = run_refresh(cfg, Database(tmp_path / "t.db"), client=SimpleNamespace(),
                        fetchers={"lever": broken, "recruitee": lambda c, e, prefilter=None: []})
     assert [(r["status"], r["message"]) for r in runs] == [("error", "ValueError: the page changed"), ("ok", "")]
+
+
+def test_the_search_tells_how_far_it_is(tmp_path):
+    seen = []
+    cfg = {"search": {"locations": ["braga"], "title_keywords": ["data"]},
+           "sources": {"lever": [{"site": "a"}, {"site": "b"}], "recruitee": [{"company": "c"}]}, "scoring": {"llm": {"enabled": False}}}
+    run_refresh(cfg, Database(tmp_path / "t.db"), client=SimpleNamespace(),
+                fetchers={"lever": lambda c, e, prefilter=None: [], "recruitee": lambda c, e, prefilter=None: []},
+                on_progress=lambda state: seen.append((len(state["sources"]), sorted(state["done"]))))
+    assert seen[0] == (3, [])  # at the start: how many there are
+    assert seen[-1] == (3, ["lever:a", "lever:b", "recruitee:c"]) and len(seen) == 4  # then one by one

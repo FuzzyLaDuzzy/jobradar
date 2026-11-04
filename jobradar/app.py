@@ -247,6 +247,7 @@ def create_app(
     refresh_lock = threading.Lock()
     scoring_lock = threading.Lock()
     app.state.scorer = None  # the thread scoring the new jobs with the AI, after a search (tests wait on it)
+    app.state.progress = {"sources": [], "done": []}  # the search under way (refresh.run_refresh's on_progress)
     refresh_kwargs = refresh_kwargs or {}
 
     def score_later(cfg: dict) -> None:
@@ -474,7 +475,8 @@ def create_app(
             raise HTTPException(409, t("Já há uma atualização a correr."))
         try:
             cfg = config_mod.load(config_path)
-            runs = run_refresh(cfg, db, score=False, **refresh_kwargs)
+            runs = run_refresh(cfg, db, score=False, on_progress=lambda state: setattr(app.state, "progress", state),
+                               **refresh_kwargs)
             if scoring.llm_available(cfg) or refresh_kwargs.get("llm_client") is not None:
                 score_later(cfg)
             return {"runs": runs, "scoring": scoring_lock.locked()}
@@ -482,6 +484,13 @@ def create_app(
             raise HTTPException(400, t("Configuração inválida: {error}", error=exc)) from exc
         finally:
             refresh_lock.release()
+
+    @app.get("/api/refresh/progress")
+    def refresh_progress():
+        """How far the search is: how many sources are read, and the ones still being read."""
+        state = app.state.progress
+        return {"running": refresh_lock.locked(), "total": len(state["sources"]), "done": len(state["done"]),
+                "waiting": [s for s in state["sources"] if s not in state["done"]]}
 
     @app.get("/api/scoring")
     def scoring_status():

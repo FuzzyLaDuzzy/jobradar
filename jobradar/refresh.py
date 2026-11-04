@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from typing import Callable
@@ -23,13 +24,19 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
-def _fetch_all(cfg: dict, client, fetchers: dict[str, Callable], prefilter) -> list[tuple]:
+def _fetch_all(cfg: dict, client, fetchers: dict[str, Callable], prefilter, on_progress=None) -> list[tuple]:
     """(kind, entry, started, finished, jobs or the exception) for every source, in the config's order.
     The platforms are read at the same time, but the sources of one platform still one after the other:
     no site gets more requests at once than before (Lever's 1 a second, say)."""
     search = cfg.get("search") or {}
     groups = [(kind, fetchers[kind], entries or []) for kind, entries in (cfg.get("sources") or {}).items()
               if kind in fetchers]
+    # on_progress({"sources": [...], "done": [...]}): at the start and as each source is read (the progress bar)
+    labels = [source_label(kind, entry) for kind, _, entries in groups for entry in entries]
+    done: list[str] = []
+    lock = threading.Lock()
+    if on_progress:
+        on_progress({"sources": labels, "done": []})
 
     def read(group):
         kind, fetch, entries = group
@@ -41,6 +48,10 @@ def _fetch_all(cfg: dict, client, fetchers: dict[str, Callable], prefilter) -> l
             except Exception as exc:  # judged with the others, below
                 jobs = exc
             results.append((kind, entry, started, _now(), jobs))
+            with lock:
+                done.append(source_label(kind, entry))
+                if on_progress:
+                    on_progress({"sources": labels, "done": list(done)})
         return results
 
     with ThreadPoolExecutor(max_workers=FETCH_THREADS) as pool:
@@ -54,8 +65,10 @@ def run_refresh(
     fetchers: dict[str, Callable] | None = None,
     llm_client=None,
     score: bool = True,
+    on_progress=None,
 ) -> list[dict]:
-    """score=False: leave the AI scoring to the caller (the app does it after answering: score_new)."""
+    """score=False: leave the AI scoring to the caller (the app does it after answering: score_new).
+    on_progress: called with the sources and the ones read so far, as they finish (_fetch_all)."""
     fetchers = fetchers or FETCHERS
     search = cfg.get("search") or {}
     own_client = client is None
@@ -66,7 +79,7 @@ def run_refresh(
         return quick_reject(job, search) is None
 
     try:
-        for kind, entry, started, finished, jobs in _fetch_all(cfg, client, fetchers, prefilter):
+        for kind, entry, started, finished, jobs in _fetch_all(cfg, client, fetchers, prefilter, on_progress):
             label = source_label(kind, entry)
             summary = dict(source=label, started_at=started, fetched=0, kept=0, new=0)
             if isinstance(jobs, SourceSkipped):

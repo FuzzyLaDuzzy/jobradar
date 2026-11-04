@@ -68,6 +68,9 @@ const EN = {
   "{kept} relevantes de {fetched}": "{kept} relevant of {fetched}",
   " · {n} novas": " · {n} new",
   "Erro: {error}": "Error: {error}",
+  "A ler as fontes: {done} de {total}": "Reading the sources: {done} of {total}",
+  "A começar…": "Starting…",
+  "ainda a ler {names}": "still reading {names}",
   "{n} fontes": "{n} sources",
   "{n} com erro": "{n} with errors",
   "A IA está a avaliar as vagas novas…": "The AI is scoring the new jobs…",
@@ -415,6 +418,7 @@ createApp({
       cutLimit: 100,
       loading: true,
       refreshing: false,
+      progress: null, // while searching: how many sources are read, and the ones still being read
       scoringNow: false, // the AI is scoring the last search's jobs
       error: "",
       tab: saved.tab || "todas",
@@ -637,6 +641,14 @@ createApp({
     async refresh() {
       this.refreshing = true;
       this.error = "";
+      this.progress = { total: 0, done: 0, waiting: [] };
+      const poll = setInterval(async () => {
+        try {
+          this.progress = await this.api("/api/refresh/progress");
+        } catch {
+          /* the bar just waits for the next one */
+        }
+      }, 600);
       try {
         const { runs, scoring } = await this.api("/api/refresh", { method: "POST" });
         const fresh = runs.reduce((n, r) => n + (r.new || 0), 0);
@@ -646,6 +658,8 @@ createApp({
       } catch (e) {
         this.error = e.message;
       } finally {
+        clearInterval(poll);
+        this.progress = null;
         this.refreshing = false;
       }
     },
