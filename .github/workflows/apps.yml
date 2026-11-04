@@ -178,7 +178,7 @@ jobs:
       - name: Install it silently, open it and check that it answers
         run: |
           $setup = (Get-ChildItem dist\JobRadar-*-windows-setup.exe).FullName
-          Start-Process $setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/TASKS=" -Wait
+          Start-Process $setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/TASKS=", "/LOG=setup.log" -Wait
           Start-Process "$env:LOCALAPPDATA\Programs\JobRadar\JobRadar.exe" -ArgumentList "--no-browser", "--port", "8124"
           foreach ($i in 1..60) {
             try { $jobs = (Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8124/api/jobs).Content; break } catch { Start-Sleep 1 }
@@ -186,6 +186,18 @@ jobs:
           if ($jobs -ne "[]") { throw "the installed JobRadar.exe didn't answer" }
           if ((Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8124/).Content -notmatch "<title>JobRadar") { throw "no page" }
           Get-ChildItem "$env:LOCALAPPDATA\JobRadar" | Select-Object Name  # its data folder: config.yaml, jobradar.db
+      - name: What the installer left, and the app's log, in an annotation
+        if: failure()
+        run: |
+          $lines = @(
+            "installed: " + ((Get-ChildItem "$env:LOCALAPPDATA\Programs\JobRadar" -ErrorAction SilentlyContinue).Name -join ", "),
+            "data: " + ((Get-ChildItem "$env:LOCALAPPDATA\JobRadar" -ErrorAction SilentlyContinue).Name -join ", "),
+            "running: " + ((Get-Process JobRadar -ErrorAction SilentlyContinue).Id -join ", "),
+            "--- jobradar.log:") + (Get-Content "$env:LOCALAPPDATA\JobRadar\jobradar.log" -Tail 30 -ErrorAction SilentlyContinue) +
+            @("--- setup.log:") + (Get-Content setup.log -Tail 25 -ErrorAction SilentlyContinue)
+          $text = ($lines -join "`n") -replace '%', '%25' -replace "`r", '' -replace "`n", '%0A'
+          Write-Output "::error title=windows::$text"
+          exit 0
       - uses: actions/upload-artifact@v4
         with:
           name: jobradar-windows-setup
