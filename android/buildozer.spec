@@ -30,6 +30,8 @@ android.ndk = 28c
 # python-for-android builds every arch in one venv, and making it again for the second arch puts
 # the bundled pip back over the upgraded one, half-mixed (pip >= 26.2 then fails to import)
 android.archs = arm64-v8a
+# a release build gives an .apk to install, not the Play Store's .aab
+android.release_artifact = apk
 android.accept_sdk_license = True
 # keeps the .env (API keys) out of Google's cloud backups
 android.allow_backup = False
