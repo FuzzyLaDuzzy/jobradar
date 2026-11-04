@@ -41,7 +41,11 @@ jobs:
         with:
           path: android/.buildozer
           key: p4a-${{ matrix.arch }}-${{ hashFiles('android/buildozer.spec') }}-${{ github.run_id }}
-          restore-keys: p4a-${{ matrix.arch }}-${{ hashFiles('android/buildozer.spec') }}-
+          # after a change to buildozer.spec, start from the last good build: python-for-android only
+          # rebuilds what changed
+          restore-keys: |
+            p4a-${{ matrix.arch }}-${{ hashFiles('android/buildozer.spec') }}-
+            p4a-${{ matrix.arch }}-
       - run: sudo apt-get update && sudo apt-get install -y autoconf automake libtool libltdl-dev pkg-config zlib1g-dev libncurses-dev libffi-dev libssl-dev cmake zip unzip
       # buildozer brings the Cython it needs (<3.0); python-for-android builds its own tools for the APK
       - run: pip install buildozer==1.6.0 2>&1 | tee android/build.log
