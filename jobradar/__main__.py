@@ -64,7 +64,8 @@ def main() -> None:
         sys.stdout = sys.stderr = open("jobradar.log", "a", encoding="utf-8", buffering=1)
     else:  # a console or pipe that is not UTF-8 (cp1252) can't print every symbol (⚙): show "?", don't crash
         for stream in (sys.stdout, sys.stderr):
-            stream.reconfigure(errors="replace")
+            if hasattr(stream, "reconfigure"):  # Android's log stream (python-for-android) has none
+                stream.reconfigure(errors="replace")
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(message)s")
     # httpx logs every URL at INFO, and the ITJobs URL carries the api_key
     logging.getLogger("httpx").setLevel(logging.WARNING)

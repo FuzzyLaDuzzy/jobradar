@@ -1,0 +1,5 @@
+# copied here by the build, from the repository root
+/jobradar/
+/config.example.yaml
+.buildozer/
+bin/
