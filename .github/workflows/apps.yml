@@ -15,6 +15,9 @@ on:
     paths: ["android/**", "windows/**", "jobradar/**", "config.example.yaml", "requirements.txt", ".github/workflows/apps.yml"]
   workflow_dispatch:
 
+permissions:
+  contents: read  # only the release job writes (its own permissions, below)
+
 concurrency:
   group: apps-${{ github.ref }}
   cancel-in-progress: true
@@ -127,7 +130,8 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - uses: reactivecircus/android-emulator-runner@v2
+      # a third party's action: pinned to a commit, which a moved tag can't change
+      - uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d  # v2.38.0
         with:
           api-level: 34
           arch: x86_64
