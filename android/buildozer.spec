@@ -26,8 +26,10 @@ android.permissions = INTERNET
 android.api = 34
 android.minapi = 24
 android.ndk = 28c
-# arm64-v8a for phones, x86_64 for the emulator that tests the build
-android.archs = arm64-v8a, x86_64
+# arm64-v8a: phones. CI also builds x86_64 for its emulator, as a build of its own (APP_ANDROID_ARCHS):
+# python-for-android builds every arch in one venv, and making it again for the second arch puts
+# the bundled pip back over the upgraded one, half-mixed (pip >= 26.2 then fails to import)
+android.archs = arm64-v8a
 android.accept_sdk_license = True
 # keeps the .env (API keys) out of Google's cloud backups
 android.allow_backup = False

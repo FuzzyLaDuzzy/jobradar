@@ -1,7 +1,8 @@
 name: android
 
-# The Android app (android/): builds the APK, then opens it on an emulator and checks that the app answers.
-# The APK is in the run's artifacts (jobradar-apk).
+# The Android app (android/): builds the APK for phones (arm64-v8a) and one for the emulator (x86_64),
+# then opens that one on an emulator and checks that the app answers. The APKs are in the run's
+# artifacts (jobradar-apk-arm64-v8a is the one for a phone).
 on:
   push:
     paths: ["android/**", ".github/workflows/android.yml"]
@@ -15,6 +16,10 @@ jobs:
   apk:
     runs-on: ubuntu-latest
     timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm64-v8a, x86_64]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -28,15 +33,15 @@ jobs:
       - uses: actions/cache/restore@v4
         with:
           path: ~/.buildozer
-          key: android-sdk-${{ github.run_id }}
-          restore-keys: android-sdk-
+          key: android-sdk-${{ matrix.arch }}-${{ github.run_id }}
+          restore-keys: android-sdk-${{ matrix.arch }}-
       # what was already compiled (Python, OpenSSL, pydantic-core): saved only after a build that worked,
-      # because a build that stops halfway can leave it broken (it did: half an upgraded pip)
+      # because a build that stops halfway can leave it broken
       - uses: actions/cache@v4
         with:
           path: android/.buildozer
-          key: p4a-${{ hashFiles('android/buildozer.spec') }}-${{ github.run_id }}
-          restore-keys: p4a-${{ hashFiles('android/buildozer.spec') }}-
+          key: p4a-${{ matrix.arch }}-${{ hashFiles('android/buildozer.spec') }}-${{ github.run_id }}
+          restore-keys: p4a-${{ matrix.arch }}-${{ hashFiles('android/buildozer.spec') }}-
       - run: sudo apt-get update && sudo apt-get install -y autoconf automake libtool libltdl-dev pkg-config zlib1g-dev libncurses-dev libffi-dev libssl-dev cmake zip unzip
       # buildozer brings the Cython it needs (<3.0); python-for-android builds its own tools for the APK
       - run: pip install buildozer==1.6.0 2>&1 | tee android/build.log
@@ -47,24 +52,22 @@ jobs:
         shell: bash
         working-directory: android
         env:
-          # python-for-android upgrades pip in its build venv to the newest; pip 26.3 (2 Nov 2026) is
-          # newer than that python-for-android release. ponytail: drop once a build passes without it
-          PIP_CONSTRAINT: ${{ github.workspace }}/android/pip-constraints.txt
+          APP_ANDROID_ARCHS: ${{ matrix.arch }}  # overrides android.archs in buildozer.spec
       - name: Put the end of the build log in annotations
         if: failure()
         run: |
           for venv in android/.buildozer/android/platform/build-*/build/venv; do
             [ -d "$venv" ] && echo "$venv: $(ls "$venv"/lib/python3*/site-packages | grep -i '^pip')" >> android/build.log
           done
-          bash android/annotate.sh android/build.log buildozer
+          bash android/annotate.sh android/build.log "buildozer ${{ matrix.arch }}"
       - uses: actions/cache/save@v4
         if: always()
         with:
           path: ~/.buildozer
-          key: android-sdk-${{ github.run_id }}
+          key: android-sdk-${{ matrix.arch }}-${{ github.run_id }}
       - uses: actions/upload-artifact@v4
         with:
-          name: jobradar-apk
+          name: jobradar-apk-${{ matrix.arch }}
           path: android/bin/*.apk
 
   emulator:
@@ -75,7 +78,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: jobradar-apk
+          name: jobradar-apk-x86_64
           path: android/bin
       - name: Let the emulator use KVM
         run: |
