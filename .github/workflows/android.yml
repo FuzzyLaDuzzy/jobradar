@@ -2,9 +2,12 @@ name: android
 
 # The Android app (android/): builds the APK for phones (arm64-v8a) and one for the emulator (x86_64),
 # then opens that one on an emulator and checks that the app answers. The APKs are in the run's
-# artifacts (jobradar-apk-arm64-v8a is the one for a phone).
+# artifacts (jobradar-apk-arm64-v8a is the one for a phone). A v tag (git tag v1.2.0, git push origin
+# v1.2.0) also publishes a GitHub release: the phone's APK and the computer's installers.
 on:
   push:
+    branches: ["**"]
+    tags: ["v*"]  # tags ignore the paths below
     paths: ["android/**", "jobradar/**", "config.example.yaml", ".github/workflows/android.yml"]  # the APK carries jobradar/
   workflow_dispatch:
 
@@ -26,6 +29,12 @@ jobs:
       SIGNED: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
     steps:
       - uses: actions/checkout@v4
+      # Android compares versions by number (p4a: "10" + min API + the digits), so each must be newer:
+      # a v1.2.3 tag gives 1.2.3; other builds 0.1.<run>, lower than any release
+      - name: The app's version
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then version="${GITHUB_REF_NAME#v}"; else version="0.1.$GITHUB_RUN_NUMBER"; fi
+          echo "APP_VERSION=$version" >> "$GITHUB_ENV"
       - name: The signing key, from the repository's secrets
         if: env.SIGNED == 'true'
         run: echo "$KEYSTORE" | base64 -d > "$RUNNER_TEMP/jobradar.keystore"
@@ -69,7 +78,6 @@ jobs:
         working-directory: android
         env:
           APP_ANDROID_ARCHS: ${{ matrix.arch }}  # overrides android.archs in buildozer.spec
-          APP_VERSION: 0.1.${{ github.run_number }}  # each build a newer version: it installs as an update
           # read by Gradle while it signs, from the environment: nothing is written into the cached build
           P4A_RELEASE_KEYSTORE: ${{ runner.temp }}/jobradar.keystore
           P4A_RELEASE_KEYALIAS: jobradar
@@ -132,3 +140,25 @@ jobs:
             smoke.log
             screen.png
             logcat.txt
+
+  release:
+    # only for a v tag, and only once the APK passed the emulator
+    if: github.ref_type == 'tag'
+    needs: emulator
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: jobradar-apk-arm64-v8a
+          path: apk
+      - name: The release, with the phone's APK and the computer's installers
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          cp apk/*.apk "JobRadar-$version-android.apk"
+          gh release create "$GITHUB_REF_NAME" "JobRadar-$version-android.apk" install.ps1 install.sh \
+            --title "JobRadar $version" --notes-file .github/release-notes.md
+        env:
+          GH_TOKEN: ${{ github.token }}

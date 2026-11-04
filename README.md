@@ -243,13 +243,13 @@ To undo: `Unregister-ScheduledTask -TaskName "JobRadar refresh"`, and delete `Jo
 
 JobRadar also runs on an Android phone by itself, with no computer: the app carries Python and the same `jobradar` code, runs its server on the phone and shows it in its own window. Your keys, settings and jobs stay in the app's private storage, and out of Google's cloud backups.
 
-**Install:** in a browser signed in to GitHub, open the repository's **Actions → android**, pick the newest run with a green ✓ and download **`jobradar-apk-arm64-v8a`** under **Artifacts**. Unzip it and open the `.apk` (Android asks once to allow installs from your browser or Files).
+**Install:** download **`JobRadar-…-android.apk`** from the [latest release](https://github.com/FuzzyLaDuzzy/jobradar/releases/latest) on your phone and open it (Android asks once to allow installs from your browser or Files). Each release has the computer installers too.
 
 **Set it up:** the welcome screen asks for the keys, and 👤 **Profile** reads your CV. To bring everything from your computer at once, paste your `config.yaml` into ⚙. The phone keeps its own list: statuses and notes don't sync with the computer.
 
 **Not on the phone yet:** scheduled searches and notifications (press **Find jobs**), ⬇ **Export CSV**, and Claude (the phone has Gemini only).
 
-**How it's built** (`android/`, `.github/workflows/android.yml`): python-for-android's webview bootstrap, built with buildozer on GitHub Actions, for `arm64-v8a` (phones) and `x86_64` (an emulator that installs the APK and checks that the app starts, its page loads, other apps are refused and its own window gets in). Any other app on a phone can reach `127.0.0.1`, so there the API answers only the app's own window, which gets a key made at each start as an HttpOnly cookie. With `ANDROID_KEYSTORE_BASE64` and `ANDROID_KEYSTORE_PASSWORD` in the repository's secrets, the builds are release APKs signed with that key, so each new version installs over the last one; without them (in a fork, say) they are debug builds.
+**How it's built** (`android/`, `.github/workflows/android.yml`): python-for-android's webview bootstrap, built with buildozer on GitHub Actions, for `arm64-v8a` (phones) and `x86_64` (an emulator that installs the APK and checks that the app starts, its page loads, other apps are refused and its own window gets in). Any other app on a phone can reach `127.0.0.1`, so there the API answers only the app's own window, which gets a key made at each start as an HttpOnly cookie. With `ANDROID_KEYSTORE_BASE64` and `ANDROID_KEYSTORE_PASSWORD` in the repository's secrets, the builds are release APKs signed with that key, so each new version installs over the last one; without them (in a fork, say) they are debug builds. A `v` tag (`git tag v1.1.0` and `git push origin v1.1.0`) publishes a release with that version, once the APK passes the emulator; its text is `.github/release-notes.md`.
 
 ## Tests
 
