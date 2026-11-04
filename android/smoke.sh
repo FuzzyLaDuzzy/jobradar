@@ -12,7 +12,7 @@ adb shell am start -n io.github.fuzzyladuzzy.jobradar/org.kivy.android.PythonAct
 adb forward tcp:8000 tcp:8000
 
 status=1
-for _ in $(seq 1 60); do
+for _ in $(seq 1 90); do
   url=$(adb logcat -d | grep -o "Opening URL: http://127.0.0.1:8000/?k=[A-Za-z0-9_-]*" | tail -1 | cut -d' ' -f3)
   if [ -n "$url" ]; then status=0; break; fi
   sleep 3
@@ -30,6 +30,9 @@ else
 fi
 adb exec-out screencap -p > screen.png
 adb logcat -d > logcat.txt
-echo "--- Python, and Android errors:"
-grep -E " python *:|AndroidRuntime|FATAL| E PythonActivity| E WebViewLoader" logcat.txt | grep -v "extracting _python_bundle" | tail -80
+pid=$(adb shell pidof io.github.fuzzyladuzzy.jobradar | tr -d '\r')
+echo "--- the app's process: ${pid:-none (it died)}"
+echo "--- Python, the app's Java, and crashes:"
+grep -E " python *:|PythonActivity|JobRadar|AndroidRuntime|FATAL|Fatal signal|DEBUG *: |UnsatisfiedLink|Exception" logcat.txt \
+  | grep -v "extracting " | tail -80
 exit "$status"
