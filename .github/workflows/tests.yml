@@ -19,3 +19,32 @@ jobs:
       - run: pip install -r requirements.txt
       # every API is faked in the tests: no keys and no network needed
       - run: python -m pytest -q
+
+  install:
+    # the one-line installers, from this checkout: they install, and the app starts and answers
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Windows installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $dir = "$env:RUNNER_TEMP\jobradar"
+          ./install.ps1 -Source . -Dir $dir -NoShortcuts -NoStart
+          Start-Process "$dir\.venv\Scripts\python.exe" -ArgumentList "-m", "jobradar", "--no-browser", "--port", "8123" -WorkingDirectory $dir
+          Start-Sleep -Seconds 10
+          Invoke-WebRequest http://127.0.0.1:8123/api/jobs -UseBasicParsing | Select-Object -ExpandProperty StatusCode
+      - name: macOS / Linux installer
+        if: runner.os != 'Windows'
+        run: |
+          dir="$RUNNER_TEMP/jobradar"
+          JOBRADAR_SOURCE=. JOBRADAR_DIR="$dir" sh install.sh < /dev/null
+          (cd "$dir" && .venv/bin/python -m jobradar --no-browser --port 8123 &)
+          sleep 10
+          curl -fsS http://127.0.0.1:8123/api/jobs

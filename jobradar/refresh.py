@@ -92,6 +92,7 @@ def run_refresh(
 
 def _score_with_llm(cfg: dict, db: Database, llm_client=None) -> None:
     limit = int(((cfg.get("scoring") or {}).get("llm") or {}).get("max_jobs_per_refresh", 40))
+    examples = db.decision_examples()  # your choices so far: jobs like the ones you applied to score higher
     for row in db.unscored(limit):
         job = Job(
             source=row["source"],
@@ -106,7 +107,7 @@ def _score_with_llm(cfg: dict, db: Database, llm_client=None) -> None:
             work_model=row["work_model"] or "",
         )
         try:
-            result = scoring.llm_score(job, cfg, llm_client)
+            result = scoring.llm_score(job, cfg, llm_client, examples)
         except Exception:  # never let the LLM break a refresh
             log.exception("LLM scoring failed for %s", row["uid"])
             break

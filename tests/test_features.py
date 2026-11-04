@@ -91,3 +91,71 @@ def test_add_job_from_a_link(client, monkeypatch):
     assert client.post("/api/jobs/from-url", json={"url": "javascript:alert(1)"}).status_code == 422
     refused = client.post("/api/jobs/from-url", json={"url": "https://www.linkedin.com/jobs/view/1"})
     assert refused.status_code == 400 and "à mão" in refused.json()["detail"]
+
+
+def test_sources_that_look_broken(tmp_path):
+    from jobradar.db import Database
+    db = Database(tmp_path / "t.db")
+
+    def run(source, status, fetched, message=""):
+        db.add_run(source=source, started_at="2026-11-03T09:00:00", finished_at="2026-11-03T09:01:00",
+                   fetched=fetched, kept=0, new=0, status=status, message=message)
+
+    for _ in range(3):
+        run("lever:acme", "ok", 40)       # fine
+        run("workday:old", "ok", 120)     # used to bring jobs...
+        run("ey", "ok", 0)                # never did
+    for _ in range(3):
+        run("lever:acme", "ok", 38)
+        run("workday:old", "ok", 0)       # ...and stopped
+        run("ey", "ok", 0)
+        run("itjobs", "skipped", 0, "Falta ITJOBS_API_KEY")  # no key: not broken
+    run("teamtailor:x", "ok", 5)
+    for _ in range(3):
+        run("teamtailor:x", "error", 0, "404 Not Found")
+    health = db.source_health()
+    assert health == [
+        {"source": "ey", "kind": "never", "runs": 6, "before": 0},
+        {"source": "teamtailor:x", "kind": "error", "runs": 3, "message": "404 Not Found"},
+        {"source": "workday:old", "kind": "empty", "runs": 3, "before": 120}]
+    assert db.source_health({"lever:acme", "ey"}) == [health[0]]  # only the sources still in the config
+
+
+def test_health_endpoint(client):
+    assert client.get("/api/health").json() == []  # no searches yet
+
+
+def test_your_choices_as_examples(tmp_path):
+    from jobradar.db import Database
+    db = Database(tmp_path / "t.db")
+    for job in JOBS + [Job(source="manual", external_id="9", company="Gamma", title="SAP Consultant", location="", url="")]:
+        db.upsert(job, 50, [], {}, "2026-11-03T09:00:00+00:00")
+    db.update(JOBS[0].uid, status="candidatei")
+    db.update("manual:9", status="descartada")
+    assert db.decision_examples() == {"liked": ["Junior AI Software Engineer (Bosch)"], "disliked": ["SAP Consultant (Gamma)"]}
+
+
+def test_filter_change_from_the_cut_tab(client):
+    client.post("/api/refresh")
+    cut = client.get("/api/cut").json()[0]
+    assert (cut["kind"], cut["word"]) == ("título sénior", "senior")  # what the suggestion needs
+    before = client.get("/api/config").json()["yaml"]
+
+    done = client.post("/api/filters", json={"action": "remove", "field": "exclude_title_keywords", "word": "Senior"}).json()
+    assert "senior" not in done["values"] and "lead" in done["values"]
+    client.post("/api/filters", json={"action": "add", "field": "locations", "word": "Lousado"})
+    client.post("/api/filters", json={"action": "add", "field": "locations", "word": "lousado"})  # already there
+    after = client.get("/api/config").json()["yaml"]
+    import yaml as _yaml
+    search = _yaml.safe_load(after)["search"]
+    assert search["locations"].count("lousado") == 1 and "senior" not in search["exclude_title_keywords"]
+    assert after.count("#") == before.count("#")  # the comments stay
+
+    client.post("/api/refresh")  # from the next search on, that job is kept
+    assert "Senior Embedded Engineer" in [j["title"] for j in client.get("/api/jobs").json()]
+
+    # only taking words out of the exclusions, and only adding to the area or the kind of job
+    assert client.post("/api/filters", json={"action": "add", "field": "exclude_keywords", "word": "x"}).status_code == 400
+    assert client.post("/api/filters", json={"action": "remove", "field": "locations", "word": "braga"}).status_code == 400
+    assert client.post("/api/filters", json={"action": "add", "field": "profile", "word": "x"}).status_code == 422
+    assert client.post("/api/filters", json={"action": "add", "field": "locations", "word": "a\nscoring: {}"}).status_code == 422

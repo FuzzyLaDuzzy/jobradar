@@ -97,6 +97,21 @@ const EN = {
   "🧩 Ajustar o CV": "🧩 Tailor my CV",
   "✂ Cortadas": "✂ Cut",
   "Modelo de IA": "AI model",
+  "Fontes que parecem avariadas": "Sources that look broken",
+  "Foi cortada pela palavra “{word}”.": "It was cut by the word “{word}”.",
+  "Deixar de cortar “{word}”": "Stop cutting “{word}”",
+  "O título não tem nenhuma das tuas palavras de área. Acrescentar uma?": "The title has none of your field's words. Add one?",
+  "Fica fora da tua zona.": "It's outside your area.",
+  "Acrescentar “{place}” à zona": "Add “{place}” to your area",
+  "Filtro mudado: vale a partir da próxima procura.": "Filter changed: it applies from the next search.",
+  "Não foi possível mudar o filtro: {error}": "Couldn't change the filter: {error}",
+  "Se for normal (a fonte não tem vagas na tua zona), podes tirá-la das fontes no ⚙.":
+    "If that's expected (the source has no jobs in your area), you can remove it from the sources in ⚙.",
+  "{source}: deu erro nas últimas {n} procuras ({error})": "{source}: failed in the last {n} searches ({error})",
+  "{source}: não trouxe vagas nas últimas {n} procuras (antes trazia {before})":
+    "{source}: brought no jobs in the last {n} searches (it used to bring {before})",
+  "{source}: ainda não trouxe nenhuma vaga em {n} procuras. O site pode ter mudado, ou não tem vagas na tua zona.":
+    "{source}: hasn't brought a single job in {n} searches. The site may have changed, or it has no jobs in your area.",
   "Gemini (Google, grátis)": "Gemini (Google, free)",
   "Claude (Anthropic, pago)": "Claude (Anthropic, paid)",
   "por omissão": "default",
@@ -373,6 +388,7 @@ createApp({
       jobs: [],
       runs: [],
       cut: [], // ✂ what the filters cut in the last search, and why
+      health: [], // sources that look broken
       cutReason: "",
       cutLimit: 100,
       loading: true,
@@ -489,6 +505,9 @@ createApp({
     cutShown() {
       return this.cutFiltered.slice(0, this.cutLimit);
     },
+    brokenSources() {
+      return new Set(this.health.map((h) => h.source));
+    },
   },
 
   watch: {
@@ -564,7 +583,8 @@ createApp({
 
     async load() {
       try {
-        [this.jobs, this.runs, this.cut] = await Promise.all([this.api("/api/jobs"), this.api("/api/runs"), this.api("/api/cut")]);
+        [this.jobs, this.runs, this.cut, this.health] = await Promise.all(
+          [this.api("/api/jobs"), this.api("/api/runs"), this.api("/api/cut"), this.api("/api/health")]);
         this.error = "";
       } catch (e) {
         this.error = this.t("Não foi possível carregar as vagas: {error}", { error: e.message });
@@ -632,6 +652,13 @@ createApp({
       }
     },
 
+    healthText(h) {
+      const source = this.sourceName(h.source);
+      if (h.kind === "error") return this.t("{source}: deu erro nas últimas {n} procuras ({error})", { source, n: h.runs, error: h.message });
+      if (h.kind === "empty") return this.t("{source}: não trouxe vagas nas últimas {n} procuras (antes trazia {before})", { source, n: h.runs, before: h.before });
+      return this.t("{source}: ainda não trouxe nenhuma vaga em {n} procuras. O site pode ter mudado, ou não tem vagas na tua zona.", { source, n: h.runs });
+    },
+
     // the other language for the draft's button, from its first line: "Assunto: ..." or "Subject: ..."
     otherLanguage(text) {
       return /^\s*assunto\b/i.test(text || "") ? "en" : "pt";
@@ -655,6 +682,45 @@ createApp({
       this.addError = "";
       this.addOpen = true;
       this.$nextTick(() => this.$refs.newUrl?.focus());
+    },
+
+    // ✂ tab, after saving a cut job: the filter change that would have kept it (only if you click it)
+    cutTip(c) {
+      const word = c.word;
+      if ((c.kind === "título sénior" || c.kind === "excluída") && word) {
+        return {
+          text: this.t("Foi cortada pela palavra “{word}”.", { word }),
+          action: "remove", field: c.kind === "título sénior" ? "exclude_title_keywords" : "exclude_keywords", words: [word],
+          button: (w) => this.t("Deixar de cortar “{word}”", { word: w }),
+        };
+      }
+      if (c.kind === "fora da área") {
+        const skip = new Set(["the", "and", "for", "with", "de", "da", "do", "das", "dos", "para", "com", "em", "e", "m/f"]);
+        const words = [...new Set(c.title.toLowerCase().split(/[^\p{L}\p{N}.#+]+/u))]
+          .filter((w) => w.length >= 3 && !skip.has(w) && !/^\d+$/.test(w)).slice(0, 4);
+        return words.length ? {
+          text: this.t("O título não tem nenhuma das tuas palavras de área. Acrescentar uma?"),
+          action: "add", field: "title_keywords", words, button: (w) => "＋ " + w,
+        } : null;
+      }
+      const place = (c.location || "").split(",")[0].trim().toLowerCase();
+      if (c.kind === "fora da zona" && place) {
+        return {
+          text: this.t("Fica fora da tua zona."), action: "add", field: "locations", words: [place],
+          button: (w) => this.t("Acrescentar “{place}” à zona", { place: w }),
+        };
+      }
+      return null;
+    },
+
+    async adjustFilter(c, tip, word) {
+      try {
+        await this.api("/api/filters", { method: "POST", body: JSON.stringify({ action: tip.action, field: tip.field, word }) });
+        c.tipDone = true;
+        this.showToast(this.t("Filtro mudado: vale a partir da próxima procura."));
+      } catch (e) {
+        this.showToast(this.t("Não foi possível mudar o filtro: {error}", { error: e.message }));
+      }
     },
 
     // "+ Add job": the posting at the link fills in the form; you check it, then add it

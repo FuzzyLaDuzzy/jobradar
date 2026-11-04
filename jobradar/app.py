@@ -25,8 +25,9 @@ from .i18n import t
 from .db import STATUSES, Database
 from .filters import reason_label
 from .models import Job
+from .text import normalize
 from .refresh import run_refresh
-from .sources import make_client
+from .sources import make_client, source_label
 
 STATIC = Path(__file__).parent / "static"
 # The names JobRadar answers to. A site whose domain is pointed at 127.0.0.1 (DNS rebinding)
@@ -94,6 +95,22 @@ class ConfigBody(BaseModel):
 
 class LanguageBody(BaseModel):
     language: str
+
+
+class FilterBody(BaseModel):
+    """✂ Cut: the change that would have kept a job ("stop cutting titles with lead", "add Lousado to the area")."""
+
+    action: Literal["remove", "add"]
+    field: Literal["exclude_title_keywords", "exclude_keywords", "title_keywords", "locations"]
+    word: str = Field(min_length=1, max_length=60)
+
+    @field_validator("word")
+    @classmethod
+    def _one_line(cls, value: str) -> str:
+        value = value.strip().lower()
+        if not value or any(c in value for c in "\r\n"):
+            raise ValueError(t("entrada inválida"))
+        return value
 
 
 class AiBody(BaseModel):
@@ -210,9 +227,27 @@ def create_app(
         """The jobs the filters cut in the last search, and why (the ✂ tab)."""
         cut = db.cut_jobs()
         for job in cut:
-            job["category"] = reason_label(job["reason"].partition(" (")[0])
+            kind, _, word = job["reason"].partition(" (")
+            job["kind"], job["word"] = kind, word.removesuffix(")")  # for the filter suggestion
+            job["category"] = reason_label(kind)
             job["reason"] = reason_label(job["reason"])
         return cut
+
+    @app.post("/api/filters")
+    def adjust_filter(body: FilterBody):
+        """One word less in an exclusion list, or one more in title_keywords / locations (from the ✂ tab)."""
+        if (body.action == "remove") != (body.field in ("exclude_title_keywords", "exclude_keywords")):
+            raise HTTPException(400, t("entrada inválida"))
+        try:
+            values = list((config_mod.load(config_path).get("search") or {}).get(body.field) or [])
+            if body.action == "remove":
+                values = [v for v in values if normalize(str(v)) != normalize(body.word)]
+            elif not any(normalize(str(v)) == normalize(body.word) for v in values):
+                values.append(body.word)
+            config_mod.update({("search", body.field): values}, config_path)
+        except config_mod.ConfigError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        return {"field": body.field, "values": values}
 
     @app.get("/api/export.csv")
     def export_csv():
@@ -397,6 +432,16 @@ def create_app(
     @app.get("/api/runs")
     def runs():
         return db.last_runs()
+
+    @app.get("/api/health")
+    def source_health():
+        """Sources that look broken (the warning above the list), among the ones in the config now."""
+        try:
+            sources = config_mod.load(config_path).get("sources") or {}
+            labels = {source_label(kind, entry) for kind, entries in sources.items() for entry in entries or []}
+        except Exception:  # an invalid config shows its own error: judge every source then
+            labels = None
+        return db.source_health(labels)
 
     @app.get("/api/config")
     def get_config():

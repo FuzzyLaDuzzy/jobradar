@@ -283,6 +283,17 @@ class Database:
         return [j["uid"] for j in self._listed()
                 if key and j["source"] != job["source"] and duplicate_key(j) == key]
 
+    def decision_examples(self, limit: int = 8) -> dict:
+        """Your latest choices, for the AI score: jobs you applied to or saved, and jobs you discarded."""
+        def titles(statuses: tuple[str, ...]) -> list[str]:
+            marks = ", ".join("?" for _ in statuses)
+            rows = self.conn.execute(
+                f"SELECT title, company FROM jobs WHERE status IN ({marks}) "
+                "ORDER BY COALESCE(applied_at, last_seen) DESC LIMIT ?", (*statuses, limit)).fetchall()
+            return [f"{r['title']} ({r['company']})" if r["company"] else r["title"] for r in rows]
+
+        return {"liked": titles(("candidatei", "guardada")), "disliked": titles(("descartada",))}
+
     def acted_on(self) -> list[dict]:
         """The jobs you did something with: applied, saved, discarded, or wrote notes about (the CSV export)."""
         rows = self.conn.execute(
@@ -314,6 +325,26 @@ class Database:
             marks = ", ".join("?" for _ in run)
             self.conn.execute(f"INSERT INTO runs ({cols}) VALUES ({marks})", tuple(run.values()))
             self.conn.commit()
+
+    def source_health(self, sources: set[str] | None = None, window: int = 3) -> list[dict]:
+        """Sources that look broken, from their last `window` searches: an error every time, nothing read after
+        having read jobs before, or nothing read ever. A site that changes its pages fails like this, quietly.
+        `sources`: the ones still in the config (the others' old runs don't count)."""
+        runs: dict[str, list[sqlite3.Row]] = {}
+        for row in self.conn.execute("SELECT source, status, fetched, message FROM runs ORDER BY id DESC"):
+            runs.setdefault(row["source"], []).append(row)
+        problems = []
+        for source, history in sorted(runs.items()):
+            last = history[:window]
+            if (sources is not None and source not in sources) or len(last) < window:
+                continue
+            before = max((r["fetched"] or 0 for r in history[window:]), default=0)
+            if all(r["status"] == "error" for r in last):
+                problems.append({"source": source, "kind": "error", "runs": window, "message": last[0]["message"] or ""})
+            elif all(r["status"] == "ok" and not r["fetched"] for r in last):
+                problems.append({"source": source, "kind": "empty" if before else "never",
+                                 "runs": window if before else len(history), "before": before})
+        return problems
 
     def last_runs(self) -> list[dict]:
         rows = self.conn.execute(

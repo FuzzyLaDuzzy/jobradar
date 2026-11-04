@@ -74,7 +74,9 @@ LinkedIn, Indeed and Glassdoor are left out on purpose (see [Limitations](#limit
 - **Follows a company in one click** (＋): on a job from a job board, **＋ Follow company** looks for that company's careers site on ten platforms and, if JobRadar can read it, adds it to your sources, so its jobs come straight from the company with the full description.
 - **Shows what the jobs ask for** (📊 Market): the skills most asked for in the jobs it found, and which ones your profile already has, so you know what to learn next.
 - **Shows the salary** (💶) when the posting states one, and filters by it (per month; a yearly amount counts over 14 payments).
-- **Shows what the filters cut** (✂ Cut): every job the last search read and left out, with the reason, so a good job cut by mistake can still be saved.
+- **Shows what the filters cut** (✂ Cut): every job the last search read and left out, with the reason, so a good job cut by mistake can still be saved; saving one offers the filter change that would have kept it, in one click.
+- **Warns when a source looks broken**: an error, or no jobs, in its last 3 searches (sites change their pages), or never a single job (maybe none in your area).
+- **Learns from your choices**: the AI score gets the jobs you applied to or saved, and the ones you discarded, as examples.
 - **Tracks your applications**: mark jobs as saved, applied (with the date) or discarded, and keep notes apart from the description. Jobs you find elsewhere (LinkedIn, a friend…) can be added by hand.
 - **Adds a job from its link**: paste it in **+ Add job** and **Read from link** fills in the title, company, place, date and description (not LinkedIn, Indeed or Glassdoor).
 - **Exports to CSV** (⬇): your applications, saved and discarded jobs and notes, in a sheet for Excel.
@@ -90,6 +92,26 @@ LinkedIn, Indeed and Glassdoor are left out on purpose (see [Limitations](#limit
 <sub>Screenshots with a made-up profile and real jobs in Lisbon.</sub>
 
 ## Install and run
+
+**Windows**: paste this line in PowerShell (Start menu → type "PowerShell"):
+
+```powershell
+irm https://raw.githubusercontent.com/FuzzyLaDuzzy/jobradar/main/install.ps1 | iex
+```
+
+It finds Python 3.10+ (or offers to install it with winget), puts JobRadar in `%LOCALAPPDATA%\JobRadar` with its own environment, adds it to the Start menu and asks whether to open it when you sign in and to search for jobs every day at 9:00 and 21:00. Then it opens the app.
+
+**macOS / Linux** (with Python 3.10+):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/FuzzyLaDuzzy/jobradar/main/install.sh | sh
+```
+
+It installs into `~/.local/share/jobradar`, adds a `jobradar` command and asks whether to add the daily searches to cron.
+
+**To update**, run the same line again: your `config.yaml`, keys, jobs and backups are kept. Want to read the installer first? [install.ps1](install.ps1), [install.sh](install.sh).
+
+### By hand
 
 You need Python 3.10 or later.
 

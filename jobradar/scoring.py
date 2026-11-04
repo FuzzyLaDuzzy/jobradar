@@ -114,7 +114,7 @@ PROMPT = """You are helping a candidate decide which job postings to apply to.
 Candidate profile:
 {profile}
 
-Job posting:
+{decisions}Job posting:
 Title: {title}
 Company: {company}
 Location: {location}
@@ -123,9 +123,24 @@ Description:
 {description}
 
 Rate from 0 to 100 how good a fit this job is for the candidate, considering the seniority
-they are looking for (see the profile), the required skills and the location. Reply with
+they are looking for (see the profile), the required skills, the location and, when there are
+any, the candidate's own choices above. Reply with
 JSON only, like {{"score": 72, "reason": "{reason}"}}."""
 REASON = {"pt": "uma frase curta em português europeu", "en": "one short sentence in English"}
+
+
+def decisions_text(examples: dict | None) -> str:
+    """The candidate's own choices as examples for the score: jobs applied to or saved, and jobs discarded.
+    Titles come from job sites: one short line each, read as data like the posting."""
+    def lines(items):
+        return "\n".join("- " + " ".join(str(item).split())[:120] for item in items)
+
+    parts = []
+    if (examples or {}).get("liked"):
+        parts.append("Jobs the candidate applied to or saved (more like these):\n" + lines(examples["liked"]))
+    if (examples or {}).get("disliked"):
+        parts.append("Jobs the candidate discarded (fewer like these):\n" + lines(examples["disliked"]))
+    return "\n\n".join(parts) + "\n\n" if parts else ""
 
 
 def _parse_llm_reply(text: str) -> tuple[int, str] | None:
@@ -145,10 +160,12 @@ def llm_available(cfg: dict) -> bool:
     return settings["enabled"] and bool(os.environ.get(settings["key_env"]))
 
 
-def llm_score(job: Job, cfg: dict, client=None) -> tuple[int, str] | None:
+def llm_score(job: Job, cfg: dict, client=None, examples: dict | None = None) -> tuple[int, str] | None:
+    """examples: {"liked": [...], "disliked": [...]}, the candidate's past choices (Database.decision_examples)."""
     settings = llm_settings(cfg)
     prompt = PROMPT.format(
         profile=(cfg.get("profile") or {}).get("cv_summary", ""),
+        decisions=decisions_text(examples),
         title=job.title,
         company=job.company,
         location=job.location,

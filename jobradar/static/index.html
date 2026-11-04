@@ -44,13 +44,18 @@
   </header>
 
   <section class="sources" v-if="runs.length">
-    <div v-for="r in runs" :key="r.source" class="source-chip" :class="r.status">
+    <div v-for="r in runs" :key="r.source" class="source-chip" :class="[r.status, { broken: brokenSources.has(r.source) }]">
       <span class="dot"></span>
       <strong>{{ sourceName(r.source) }}</strong>
       <span v-if="r.status === 'ok'">{{ t('{kept} relevantes de {fetched}', { kept: r.kept, fetched: r.fetched }) }}<b v-if="r.new">{{ t(' · {n} novas', { n: r.new }) }}</b></span>
       <span v-else class="msg" :title="r.message">{{ r.status === 'skipped' ? r.message : t('Erro: {error}', { error: r.message }) }}</span>
     </div>
   </section>
+  <div class="health" v-if="health.length">
+    <b>⚠ {{ t('Fontes que parecem avariadas') }}</b>
+    <ul><li v-for="h in health" :key="h.source">{{ healthText(h) }}</li></ul>
+    <p class="muted small">{{ t('Se for normal (a fonte não tem vagas na tua zona), podes tirá-la das fontes no ⚙.') }}</p>
+  </div>
 
   <nav class="tabs" :aria-label="t('Estado das vagas')">
     <button v-for="tb in tabs" :key="tb.key" :class="{ active: tab === tb.key }" @click="tab = tb.key">
@@ -103,6 +108,10 @@
         </div>
         <span class="badge warn">{{ c.reason }}</span>
         <button class="btn ghost" @click="keepCut(c)" :disabled="c.kept">{{ c.kept ? t('Guardada ✓') : t('＋ Guardar') }}</button>
+        <div class="cut-tip" v-if="c.kept && !c.tipDone && cutTip(c)">
+          <span>{{ cutTip(c).text }}</span>
+          <button v-for="w in cutTip(c).words" :key="w" class="btn" @click="adjustFilter(c, cutTip(c), w)">{{ cutTip(c).button(w) }}</button>
+        </div>
       </div>
       <button class="btn" v-if="cutFiltered.length > cutLimit" @click="cutLimit += 100">
         {{ t('Mostrar mais ({n})', { n: cutFiltered.length - cutLimit }) }}

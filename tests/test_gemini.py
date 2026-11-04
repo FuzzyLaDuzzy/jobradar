@@ -131,3 +131,23 @@ def test_other_errors_are_not_retried(cfg, monkeypatch):
     with pytest.raises(gemini.GeminiError, match="recusada"):
         message.write(job, gemini_cfg(cfg), client(handler))
     assert len(seen) == 1  # a refused key is refused by every model
+
+
+def test_scoring_learns_from_your_choices(cfg, monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "k")
+    seen = []
+
+    def handler(request):
+        seen.append(json.loads(request.content)["contents"][0]["parts"][0]["text"])
+        return httpx.Response(200, json={"candidates": [{"content": {"parts": [{"text": '{"score": 70, "reason": "ok"}'}]}}]})
+
+    from jobradar.models import Job
+    job = Job(source="s", external_id="1", company="X", title="Data Analyst", location="Braga", url="u")
+    examples = {"liked": ["AI Engineer (Acme)", "Backend\nDeveloper (Beta)"], "disliked": ["SAP Consultant (Gamma)"]}
+    scoring.llm_score(job, gemini_cfg(cfg), client(handler), examples)
+    prompt = seen[0]
+    assert "applied to or saved (more like these):\n- AI Engineer (Acme)\n- Backend Developer (Beta)" in prompt  # one line each
+    assert "discarded (fewer like these):\n- SAP Consultant (Gamma)" in prompt
+    assert prompt.index("discarded") < prompt.index("Job posting:")
+    scoring.llm_score(job, gemini_cfg(cfg), client(handler))  # no choices yet: no section
+    assert "more like these" not in seen[1]

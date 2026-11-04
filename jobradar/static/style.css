@@ -110,6 +110,13 @@ body {
 .source-chip.skipped .dot { background: var(--mid); }
 .source-chip.error .dot { background: var(--danger); }
 .source-chip.error .msg { color: var(--danger); }
+.source-chip.broken { border-color: var(--warn); }
+.source-chip.broken .dot { background: var(--warn); }
+.health {
+  margin: 12px 0 0; padding: 10px 14px; border-radius: 12px; background: var(--warn-bg); color: var(--warn); font-size: 13.5px;
+}
+.health ul { margin: 6px 0 4px; padding-left: 18px; }
+.health .muted { margin: 0; }
 
 /* tabs */
 .tabs { display: flex; gap: 4px; margin: 18px 0 12px; border-bottom: 1px solid var(--border); overflow-x: auto; }
@@ -145,7 +152,12 @@ body {
   display: flex; align-items: center; gap: 12px; padding: 10px 14px; margin-bottom: 8px;
   background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
 }
+.cut-row { flex-wrap: wrap; }
 .cut-main { flex: 1; min-width: 0; }
+.cut-tip {
+  flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  padding-top: 8px; border-top: 1px dashed var(--border); font-size: 13.5px; color: var(--muted);
+}
 .cut-main .title { font-weight: 600; color: var(--text); text-decoration: none; }
 .cut-main .title:hover { color: var(--accent); }
 .cut-main .meta { font-size: 13px; color: var(--muted); }
