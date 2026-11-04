@@ -33,6 +33,8 @@ adb logcat -d > logcat.txt
 pid=$(adb shell pidof io.github.fuzzyladuzzy.jobradar | tr -d '\r')
 echo "--- the app's process: ${pid:-none (it died)}"
 echo "--- Python, the app's Java, and crashes:"
-grep -E " python *:|PythonActivity|JobRadar|AndroidRuntime|FATAL|Fatal signal|DEBUG *: |UnsatisfiedLink|Exception" logcat.txt \
-  | grep -v "extracting " | tail -80
+pkg=io.github.fuzzyladuzzy.jobradar
+# the app's own lines, crashes, and Android saying why it ended the app (not the system's other noise)
+grep -E " python *:|PythonActivity|WebViewLoader|JobRadar|AndroidRuntime|FATAL|Fatal signal|DEBUG *: |chromium|$pkg" logcat.txt \
+  | grep -v "extracting " | tail -100
 exit "$status"
