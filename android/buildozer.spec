@@ -14,7 +14,8 @@ source.exclude_dirs = bin,.buildozer,__pycache__
 # requirements.txt, pinned, plus what those packages pull in (python-for-android doesn't resolve them).
 # pydantic-core is Rust: python-for-android compiles it with its own recipe (2.41.4), and pydantic 2.12.3
 # is the release made for that version. No anthropic: on the phone the AI is Gemini, over httpx.
-requirements = python3,hostpython3,sqlite3,openssl,pydantic-core,pydantic==2.12.3,annotated-types==0.8.0,typing-inspection==0.4.4,typing-extensions==4.16.0,fastapi==0.162.0,starlette==1.10.0,annotated-doc==0.0.5,uvicorn==0.54.0,h11==0.16.0,click==8.5.0,anyio==4.16.0,sniffio==1.3.1,idna==3.20,httpx==0.28.1,httpcore==1.0.9,certifi==2026.10.23,pyyaml==6.0.3
+# pyjnius: main.py opens the app's window with the key (PythonActivity.loadUrl).
+requirements = python3,hostpython3,sqlite3,openssl,pyjnius,pydantic-core,pydantic==2.12.3,annotated-types==0.8.0,typing-inspection==0.4.4,typing-extensions==4.16.0,fastapi==0.162.0,starlette==1.10.0,annotated-doc==0.0.5,uvicorn==0.54.0,h11==0.16.0,click==8.5.0,anyio==4.16.0,sniffio==1.3.1,idna==3.20,httpx==0.28.1,httpcore==1.0.9,certifi==2026.10.23,pyyaml==6.0.3
 
 icon.filename = %(source.dir)s/jobradar/static/icon-512.png
 orientation = portrait

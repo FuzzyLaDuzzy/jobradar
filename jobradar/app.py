@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import csv
 import hashlib
+import hmac
 import io
 import os
 import re
@@ -14,7 +15,7 @@ from typing import Literal
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field, field_validator
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -33,6 +34,7 @@ STATIC = Path(__file__).parent / "static"
 # The names JobRadar answers to. A site whose domain is pointed at 127.0.0.1 (DNS rebinding)
 # arrives with its own name in the Host header and is turned away.
 ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
+TOKEN_COOKIE = "jobradar"
 
 
 class JobUpdate(BaseModel):
@@ -186,6 +188,10 @@ class CvBody(BaseModel):
     pdf: str = Field(max_length=MAX_CV_BYTES * 4 // 3 + 4)  # base64 of a PDF of up to 5 MB
 
 
+def _same(given: str | None, token: str) -> bool:
+    return hmac.compare_digest((given or "").encode(), token.encode())  # in constant time
+
+
 def key_status() -> dict[str, bool]:
     """Which keys are set: never their values."""
     return {key: bool(os.environ.get(key)) for key in config_mod.KEYS}
@@ -198,8 +204,12 @@ def create_app(
     llm_client=None,
     env_path: Path | str = ".env",
     allowed_hosts: list[str] | None = None,
+    token: str | None = None,
 ) -> FastAPI:
+    """token: on the phone (android/main.py), where any other app can reach 127.0.0.1. The API then
+    answers only the app's own window, which opened /?k=<token> once and got the cookie."""
     app = FastAPI(title="JobRadar")
+    app.state.opened = threading.Event()  # someone opened the page: the phone's loading screen is done
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts or ALLOWED_HOSTS)
 
     @app.middleware("http")
@@ -209,6 +219,8 @@ def create_app(
         origin = request.headers.get("origin")
         if request.method not in ("GET", "HEAD") and origin and urlsplit(origin).netloc != request.headers.get("host"):
             return JSONResponse({"detail": t("Pedido recusado: vem de outro site.")}, status_code=403)
+        if token and request.url.path.startswith("/api/") and not _same(request.cookies.get(TOKEN_COOKIE), token):
+            return JSONResponse({"detail": t("Pedido recusado: vem de outra app.")}, status_code=403)
         return await call_next(request)
 
     db = Database(db_path)
@@ -516,7 +528,12 @@ def create_app(
         return {"language": i18n.language}
 
     @app.get("/")
-    def index():
+    def index(k: str = ""):
+        if token and _same(k, token):  # the phone app's window, once: from now on the cookie says it's the app
+            response = RedirectResponse("/", status_code=303)
+            response.set_cookie(TOKEN_COOKIE, token, httponly=True, samesite="strict")
+            return response
+        app.state.opened.set()
         return FileResponse(STATIC / "index.html")
 
     app.mount("/static", StaticFiles(directory=STATIC), name="static")

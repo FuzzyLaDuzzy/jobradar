@@ -43,8 +43,7 @@ jobs:
       # the run's annotations can be read without signing in to GitHub, its logs can't
       - name: Put the end of the build log in an annotation
         if: failure()
-        run: tail -n 120 android/build.log | sed 's/%/%25/g; s//%0D/g' | sed ':a;N;$!ba;s/
-/%0A/g' | sed 's/^/::error title=buildozer::/'
+        run: tail -n 120 android/build.log | awk 'BEGIN { ORS = "%0A" } { gsub(/%/, "%25"); gsub(/\r/, ""); print }' | sed 's/^/::error title=buildozer::/'
       - uses: actions/cache/save@v4
         if: always()
         with:
@@ -80,8 +79,7 @@ jobs:
           script: bash android/smoke.sh
       - name: Put Python's output in an annotation
         if: failure()
-        run: grep -E " python *:" logcat.txt | tail -n 120 | sed 's/%/%25/g' | sed ':a;N;$!ba;s/
-/%0A/g' | sed 's/^/::error title=logcat::/'
+        run: grep -E " python *:" logcat.txt | tail -n 120 | awk 'BEGIN { ORS = "%0A" } { gsub(/%/, "%25"); gsub(/\r/, ""); print }' | sed 's/^/::error title=logcat::/'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
