@@ -34,7 +34,9 @@ jobs:
           key: buildozer-${{ github.run_id }}
           restore-keys: buildozer-
       - run: sudo apt-get update && sudo apt-get install -y autoconf automake libtool libltdl-dev pkg-config zlib1g-dev libncurses-dev libffi-dev libssl-dev cmake zip unzip
-      - run: pip install buildozer==1.6.0 cython==3.3.0
+      # buildozer brings the Cython it needs (<3.0); python-for-android builds its own tools for the APK
+      - run: pip install buildozer==1.6.0 2>&1 | tee android/build.log
+        shell: bash
       # the same jobradar package as on the computer, next to android/main.py
       - run: cp -r jobradar config.example.yaml android/
       - run: buildozer android debug 2>&1 | tee build.log
