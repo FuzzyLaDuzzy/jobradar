@@ -94,7 +94,9 @@ LinkedIn, Indeed and Glassdoor are left out on purpose (see [Limitations](#limit
 
 ## Install and run
 
-**Windows**: paste this line in PowerShell (Start menu → type "PowerShell"):
+**Windows, no Python needed**: download **`JobRadar-…-windows-setup.exe`** from the [latest release](https://github.com/FuzzyLaDuzzy/jobradar/releases/latest) and run it. It brings its own Python, installs for your user only (no administrator), adds JobRadar to the Start menu and can open it when you sign in and search for jobs at 9:00 and 21:00. The installer isn't code-signed yet, so Windows may say "Windows protected your PC": choose **More info → Run anyway**. Your data stays in `%LOCALAPPDATA%\JobRadar`, also when you uninstall.
+
+**Windows, with Python**: paste this line in PowerShell (Start menu → type "PowerShell"):
 
 ```powershell
 irm https://raw.githubusercontent.com/FuzzyLaDuzzy/jobradar/main/install.ps1 | iex
@@ -249,7 +251,7 @@ JobRadar also runs on an Android phone by itself, with no computer: the app carr
 
 **Not on the phone yet:** scheduled searches and notifications (press **Find jobs**), ⬇ **Export CSV**, and Claude (the phone has Gemini only).
 
-**How it's built** (`android/`, `.github/workflows/android.yml`): python-for-android's webview bootstrap, built with buildozer on GitHub Actions, for `arm64-v8a` (phones) and `x86_64` (an emulator that installs the APK and checks that the app starts, its page loads, other apps are refused and its own window gets in). Any other app on a phone can reach `127.0.0.1`, so there the API answers only the app's own window, which gets a key made at each start as an HttpOnly cookie. With `ANDROID_KEYSTORE_BASE64` and `ANDROID_KEYSTORE_PASSWORD` in the repository's secrets, the builds are release APKs signed with that key, so each new version installs over the last one; without them (in a fork, say) they are debug builds. A `v` tag (`git tag v1.1.0` and `git push origin v1.1.0`) publishes a release with that version, once the APK passes the emulator; its text is `.github/release-notes.md`.
+**How it's built** (`android/`, `.github/workflows/apps.yml`): python-for-android's webview bootstrap, built with buildozer on GitHub Actions, for `arm64-v8a` (phones) and `x86_64` (an emulator that installs the APK and checks that the app starts, its page loads, other apps are refused and its own window gets in). Any other app on a phone can reach `127.0.0.1`, so there the API answers only the app's own window, which gets a key made at each start as an HttpOnly cookie. With `ANDROID_KEYSTORE_BASE64` and `ANDROID_KEYSTORE_PASSWORD` in the repository's secrets, the builds are release APKs signed with that key, so each new version installs over the last one; without them (in a fork, say) they are debug builds. A `v` tag (`git tag v1.1.0` and `git push origin v1.1.0`) publishes a release with that version: the APK, the Windows installer (`windows/`: PyInstaller and Inno Setup, installed silently and opened by the same workflow) and the one-line installers, once the APK passed the emulator and the installer ran; its text is `.github/release-notes.md`.
 
 ## Tests
 
@@ -276,6 +278,7 @@ jobradar/
   app.py            FastAPI
   static/           the interface (Vue 3, no build step)
 android/            the Android app: buildozer.spec, main.py (starts the server on the phone), the CV's file chooser
+windows/            the Windows installer: start.py (JobRadar.exe), JobRadar.iss (Inno Setup)
 config.example.yaml the starting configuration
 tests/              pytest
 ```

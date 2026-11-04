@@ -6,3 +6,7 @@ __pycache__/
 *.log
 backups/
 config.yaml
+# the Windows build (PyInstaller, Inno Setup)
+build/
+dist/
+JobRadar.spec

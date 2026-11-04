@@ -1,18 +1,22 @@
-name: android
+name: apps
 
-# The Android app (android/): builds the APK for phones (arm64-v8a) and one for the emulator (x86_64),
-# then opens that one on an emulator and checks that the app answers. The APKs are in the run's
-# artifacts (jobradar-apk-arm64-v8a is the one for a phone). A v tag (git tag v1.2.0, git push origin
-# v1.2.0) also publishes a GitHub release: the phone's APK and the computer's installers.
+# The apps, each built and then tried out:
+# - Android (android/): the APK for phones (arm64-v8a) and one for an emulator (x86_64), which installs it
+#   and checks that the app answers;
+# - Windows (windows/): JobRadar.exe with Python inside (PyInstaller) in an installer (Inno Setup), which
+#   is installed silently and checked the same way.
+# They are in the run's artifacts. A v tag (git tag v1.2.0, git push origin v1.2.0) also publishes them
+# as a GitHub release, with the one-line installers for Windows, macOS and Linux.
 on:
   push:
     branches: ["**"]
     tags: ["v*"]  # tags ignore the paths below
-    paths: ["android/**", "jobradar/**", "config.example.yaml", ".github/workflows/android.yml"]  # the APK carries jobradar/
+    # the apps carry jobradar/ and its requirements
+    paths: ["android/**", "windows/**", "jobradar/**", "config.example.yaml", "requirements.txt", ".github/workflows/apps.yml"]
   workflow_dispatch:
 
 concurrency:
-  group: android-${{ github.ref }}
+  group: apps-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -141,10 +145,52 @@ jobs:
             screen.png
             logcat.txt
 
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: The app's version (as for Android)
+        shell: bash
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ]; then version="${GITHUB_REF_NAME#v}"; else version="0.1.$GITHUB_RUN_NUMBER"; fi
+          echo "APP_VERSION=$version" >> "$GITHUB_ENV"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt pyinstaller==6.22.3
+      # uvicorn picks its parts by name at run time, so PyInstaller doesn't see them on its own
+      - name: JobRadar.exe, with Python inside
+        run: >-
+          pyinstaller --noconfirm --windowed --name JobRadar --icon jobradar/static/icon.ico --paths .
+          --collect-data jobradar --collect-submodules uvicorn --add-data "config.example.yaml;." windows/start.py
+      - name: The installer
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress }
+          & $iscc "/DVersion=$env:APP_VERSION" windows\JobRadar.iss
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+      - name: Install it silently, open it and check that it answers
+        run: |
+          $setup = (Get-ChildItem dist\JobRadar-*-windows-setup.exe).FullName
+          Start-Process $setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/TASKS=" -Wait
+          Start-Process "$env:LOCALAPPDATA\Programs\JobRadar\JobRadar.exe" -ArgumentList "--no-browser", "--port", "8124"
+          foreach ($i in 1..60) {
+            try { $jobs = (Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8124/api/jobs).Content; break } catch { Start-Sleep 1 }
+          }
+          if ($jobs -ne "[]") { throw "the installed JobRadar.exe didn't answer" }
+          if ((Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8124/).Content -notmatch "<title>JobRadar") { throw "no page" }
+          Get-ChildItem "$env:LOCALAPPDATA\JobRadar" | Select-Object Name  # its data folder: config.yaml, jobradar.db
+      - uses: actions/upload-artifact@v4
+        with:
+          name: jobradar-windows-setup
+          path: dist/JobRadar-*-windows-setup.exe
+
   release:
-    # only for a v tag, and only once the APK passed the emulator
+    # only for a v tag, and only once the APK passed the emulator and the installer installed and ran
     if: github.ref_type == 'tag'
-    needs: emulator
+    needs: [emulator, windows]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -154,11 +200,15 @@ jobs:
         with:
           name: jobradar-apk-arm64-v8a
           path: apk
-      - name: The release, with the phone's APK and the computer's installers
+      - uses: actions/download-artifact@v4
+        with:
+          name: jobradar-windows-setup
+          path: setup
+      - name: The release, with the phone's APK, the Windows installer and the one-line installers
         run: |
           version="${GITHUB_REF_NAME#v}"
           cp apk/*.apk "JobRadar-$version-android.apk"
-          gh release create "$GITHUB_REF_NAME" "JobRadar-$version-android.apk" install.ps1 install.sh \
+          gh release create "$GITHUB_REF_NAME" "JobRadar-$version-android.apk" setup/*.exe install.ps1 install.sh \
             --title "JobRadar $version" --notes-file .github/release-notes.md
         env:
           GH_TOKEN: ${{ github.token }}

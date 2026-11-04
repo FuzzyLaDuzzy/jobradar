@@ -4,7 +4,9 @@ JobRadar finds junior jobs and internships in your area of Portugal on many site
 
 **Android phone**: download **`JobRadar-…-android.apk`** below and open it. Android asks once to allow installs from your browser or Files. The app runs on the phone with no computer, and later versions install over it, keeping your keys, settings and jobs.
 
-**Windows**: paste this line in PowerShell (Start menu → type "PowerShell"):
+**Windows**: download **`JobRadar-…-windows-setup.exe`** below and run it. It brings its own Python, installs for your user only (no administrator), adds JobRadar to the Start menu and can open it when you sign in and search for jobs at 9:00 and 21:00. The installer isn't code-signed yet, so Windows may say "Windows protected your PC": choose **More info → Run anyway**.
+
+Or, if you have Python 3.10+, paste this line in PowerShell (Start menu → type "PowerShell"):
 
 ```powershell
 irm https://raw.githubusercontent.com/FuzzyLaDuzzy/jobradar/main/install.ps1 | iex
@@ -16,7 +18,7 @@ irm https://raw.githubusercontent.com/FuzzyLaDuzzy/jobradar/main/install.ps1 | i
 curl -fsSL https://raw.githubusercontent.com/FuzzyLaDuzzy/jobradar/main/install.sh | sh
 ```
 
-To update on a computer, run the same line again: your `config.yaml`, keys, jobs and backups are kept. The two installers are also below, to read before you run them.
+To update on a computer, run the new installer or the same line again: your `config.yaml`, keys, jobs and backups are kept (in `%LOCALAPPDATA%\JobRadar` on Windows). The one-line installers are also below, to read before you run them.
 
 On first start, the welcome screen asks for the keys (all optional: ITJobs, and Gemini for the free AI), and 👤 **Profile** reads your CV.
 
