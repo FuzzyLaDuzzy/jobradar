@@ -24,15 +24,19 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      # the Android SDK and NDK, and what was already compiled (Python, OpenSSL, pydantic-core): saved
-      # even when a build fails, so the next one starts from there
+      # the Android SDK and NDK (only downloads): saved even when a build fails
       - uses: actions/cache/restore@v4
         with:
-          path: |
-            ~/.buildozer
-            android/.buildozer
-          key: buildozer-${{ github.run_id }}
-          restore-keys: buildozer-
+          path: ~/.buildozer
+          key: android-sdk-${{ github.run_id }}
+          restore-keys: android-sdk-
+      # what was already compiled (Python, OpenSSL, pydantic-core): saved only after a build that worked,
+      # because a build that stops halfway can leave it broken (it did: half an upgraded pip)
+      - uses: actions/cache@v4
+        with:
+          path: android/.buildozer
+          key: p4a-${{ hashFiles('android/buildozer.spec') }}-${{ github.run_id }}
+          restore-keys: p4a-${{ hashFiles('android/buildozer.spec') }}-
       - run: sudo apt-get update && sudo apt-get install -y autoconf automake libtool libltdl-dev pkg-config zlib1g-dev libncurses-dev libffi-dev libssl-dev cmake zip unzip
       # buildozer brings the Cython it needs (<3.0); python-for-android builds its own tools for the APK
       - run: pip install buildozer==1.6.0 2>&1 | tee android/build.log
@@ -42,16 +46,22 @@ jobs:
       - run: buildozer android debug 2>&1 | tee build.log
         shell: bash
         working-directory: android
+        env:
+          # python-for-android upgrades pip in its build venv to the newest; pip 26.3 (2 Nov 2026) is
+          # newer than that python-for-android release. ponytail: drop once a build passes without it
+          PIP_CONSTRAINT: ${{ github.workspace }}/android/pip-constraints.txt
       - name: Put the end of the build log in annotations
         if: failure()
-        run: bash android/annotate.sh android/build.log buildozer
+        run: |
+          for venv in android/.buildozer/android/platform/build-*/build/venv; do
+            [ -d "$venv" ] && echo "$venv: $(ls "$venv"/lib/python3*/site-packages | grep -i '^pip')" >> android/build.log
+          done
+          bash android/annotate.sh android/build.log buildozer
       - uses: actions/cache/save@v4
         if: always()
         with:
-          path: |
-            ~/.buildozer
-            android/.buildozer
-          key: buildozer-${{ github.run_id }}
+          path: ~/.buildozer
+          key: android-sdk-${{ github.run_id }}
       - uses: actions/upload-artifact@v4
         with:
           name: jobradar-apk
