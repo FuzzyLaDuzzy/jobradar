@@ -42,10 +42,9 @@ jobs:
       - run: buildozer android debug 2>&1 | tee build.log
         shell: bash
         working-directory: android
-      # the run's annotations can be read without signing in to GitHub, its logs can't
-      - name: Put the end of the build log in an annotation
+      - name: Put the end of the build log in annotations
         if: failure()
-        run: tail -n 120 android/build.log | awk 'BEGIN { ORS = "%0A" } { gsub(/%/, "%25"); gsub(/\r/, ""); print }' | sed 's/^/::error title=buildozer::/'
+        run: bash android/annotate.sh android/build.log buildozer
       - uses: actions/cache/save@v4
         if: always()
         with:
@@ -79,9 +78,9 @@ jobs:
           arch: x86_64
           target: google_apis
           script: bash android/smoke.sh
-      - name: Put Python's output in an annotation
+      - name: Put Python's output in annotations
         if: failure()
-        run: grep -E " python *:" logcat.txt | tail -n 120 | awk 'BEGIN { ORS = "%0A" } { gsub(/%/, "%25"); gsub(/\r/, ""); print }' | sed 's/^/::error title=logcat::/'
+        run: grep -E " python *:" logcat.txt > python.txt; bash android/annotate.sh python.txt logcat
       - uses: actions/upload-artifact@v4
         if: always()
         with:
