@@ -62,6 +62,7 @@ def run_refresh(
                         job.logo = job.logo or entry.get("logo", "")
                     summary["fetched"] = len(jobs)
                     kept: set[str] = set()
+                    new: set[str] = set()
                     cut: list[tuple[Job, str]] = []  # shown in the ✂ tab, to catch good jobs cut by mistake
                     for job in jobs:
                         keep, reason, flags = evaluate(job, search)
@@ -71,10 +72,12 @@ def run_refresh(
                         kw, reasons = scoring.keyword_score(job, cfg, flags)
                         kept.add(job.uid)
                         if db.upsert(job, kw, reasons, flags, now):
-                            summary["new"] += 1
+                            new.add(job.uid)
                     summary["kept"] = len(kept)
                     fetched = {j.uid for j in jobs}
                     db.mark_gone(label, fetched)
+                    # a repost of a job you acted on isn't new: it keeps your status (after mark_gone: the old one is gone)
+                    summary["new"] = len(new) - db.carry_over(label, new)
                     db.mark_unmatched(label, fetched, kept)
                     db.replace_cut(label, cut, now)
                     summary.update(status="ok", message="")

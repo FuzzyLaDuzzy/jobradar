@@ -10,7 +10,10 @@ from pathlib import Path
 from .models import Job
 from .text import company_key, normalize
 
-STATUSES = ("nova", "guardada", "candidatei", "descartada")
+STATUSES = ("nova", "guardada", "candidatei", "entrevista", "oferta", "rejeitada", "descartada")
+# the statuses of a job you applied to: "Applications" tab, and the date you applied stays
+APPLIED = ("candidatei", "entrevista", "oferta", "rejeitada")
+_TRACKED = ("guardada",) + APPLIED  # listed even when they no longer pass the filters
 
 
 # job boards and agencies that repost companies' jobs: the company's own posting is the one kept
@@ -177,6 +180,35 @@ class Database:
             self.conn.commit()
             return row is None
 
+    def carry_over(self, source: str, new_uids: set[str]) -> int:
+        """A job reposted under a new id: if the old one is gone from the same source, your status, notes and
+        application date move to the new one, so a job you applied to doesn't come back as new. Two postings
+        that are both still published stay two jobs, as in merge_duplicates."""
+        if not new_uids:
+            return 0
+        with self._lock:
+            old = [dict(r) for r in self.conn.execute(
+                "SELECT uid, company, title, location, status, notes, applied_at FROM jobs "
+                "WHERE source = ? AND active = 0 AND (status != 'nova' OR notes != '') ORDER BY last_seen DESC",
+                (source,))]
+            moved = 0
+            for uid in new_uids:
+                new = self.conn.execute("SELECT company, title, location, flags FROM jobs WHERE uid = ?", (uid,)).fetchone()
+                key = duplicate_key(dict(new)) if new else None
+                match = next((o for o in old if key and duplicate_key(o) == key), None)
+                if match is None:
+                    continue
+                old.remove(match)
+                flags = json.loads(new["flags"] or "{}") | {"reposted": True}
+                self.conn.execute("UPDATE jobs SET status = ?, notes = ?, applied_at = ?, flags = ? WHERE uid = ?",
+                                  (match["status"], match["notes"], match["applied_at"], json.dumps(flags), uid))
+                # the old copy is closed and out of the list: everything you had on it is on the new one now
+                self.conn.execute("UPDATE jobs SET status = 'nova', notes = '', applied_at = NULL, matches = 0 "
+                                  "WHERE uid = ?", (match["uid"],))
+                moved += 1
+            self.conn.commit()
+        return moved
+
     def mark_gone(self, source: str, seen_uids: set[str]) -> int:
         """Jobs from `source` that no longer appear are marked inactive (closed)."""
         with self._lock:
@@ -234,7 +266,7 @@ class Database:
         with self._lock:
             if status is not None:
                 self.conn.execute("UPDATE jobs SET status = ? WHERE uid = ?", (status, uid))
-            if status == "candidatei":  # the first click is the date you applied
+            if status in APPLIED:  # the first click is the date you applied; interview, offer... keep it
                 now = datetime.now(timezone.utc).isoformat(timespec="seconds")
                 self.conn.execute("UPDATE jobs SET applied_at = COALESCE(applied_at, ?) WHERE uid = ?", (now, uid))
             elif status in ("nova", "guardada"):  # un-applied; a later rejection (descartada) keeps the date
@@ -268,7 +300,7 @@ class Database:
     def _listed(self) -> list[dict]:
         """Jobs that pass the current filters, plus any you saved or applied to."""
         rows = self.conn.execute(
-            "SELECT * FROM jobs WHERE matches = 1 OR status IN ('guardada', 'candidatei') "
+            f"SELECT * FROM jobs WHERE matches = 1 OR status IN ({', '.join(repr(s) for s in _TRACKED)}) "
             "ORDER BY score DESC, posted_at DESC"
         ).fetchall()
         return [_row_to_dict(r) for r in rows]
@@ -292,7 +324,7 @@ class Database:
                 "ORDER BY COALESCE(applied_at, last_seen) DESC LIMIT ?", (*statuses, limit)).fetchall()
             return [f"{r['title']} ({r['company']})" if r["company"] else r["title"] for r in rows]
 
-        return {"liked": titles(("candidatei", "guardada")), "disliked": titles(("descartada",))}
+        return {"liked": titles(_TRACKED), "disliked": titles(("descartada",))}
 
     def acted_on(self) -> list[dict]:
         """The jobs you did something with: applied, saved, discarded, or wrote notes about (the CSV export)."""

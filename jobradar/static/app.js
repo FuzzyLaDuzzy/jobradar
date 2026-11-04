@@ -9,6 +9,9 @@ const SOURCE_NAMES = {
 const WORK_MODELS = { remote: "Remoto", hybrid: "Híbrido", "on-site": "Presencial", onsite: "Presencial" };
 const EMPTY_JOB = () => ({ title: "", company: "", url: "", location: "", notes: "", description: "", posted_at: "" });
 const WELCOME_KEY = "jobradar.welcomed";
+// the Applications tab: applied, and how it went (like APPLIED in jobradar/db.py)
+const APPLIED = ["candidatei", "entrevista", "oferta", "rejeitada"];
+const FOLLOW_UP_DAYS = 7; // an application with no reply for this long gets the follow-up reminder
 const THEME_KEY = "jobradar.theme"; // "light" or "dark"; none = follow the system (style.css)
 
 function savedTheme() {
@@ -153,6 +156,21 @@ const EN = {
   "★ Guardar": "★ Save",
   "✓ Candidatei-me": "✓ Applied",
   "✕ Descartar": "✕ Discard",
+  "🎤 Entrevista": "🎤 Interview",
+  "🏆 Oferta": "🏆 Offer",
+  "⛔ Rejeitada": "⛔ Rejected",
+  "Entrevistas": "Interviews",
+  "Ofertas": "Offers",
+  "Rejeitadas": "Rejected",
+  "Sem resposta": "No reply yet",
+  "Taxa de resposta": "Reply rate",
+  "Sem resposta há {n} dias: escrever follow-up": "No reply for {n} days: write a follow-up",
+  "✉ Email de seguimento": "✉ Follow-up email",
+  "↻ Outro email de seguimento": "↻ Another follow-up email",
+  "Email de seguimento": "Follow-up email",
+  "Republicada": "Reposted",
+  "A empresa voltou a publicar esta vaga: o estado e as notas passaram para aqui.":
+    "The company posted this job again: its status and notes moved here.",
   // settings and add job
   "Fechar": "Close",
   "chave encontrada": "key found",
@@ -453,13 +471,13 @@ createApp({
       ];
     },
     visible() {
-      return this.jobs.filter((j) => this.showInactive || j.active || j.status === "candidatei");
+      return this.jobs.filter((j) => this.showInactive || j.active || APPLIED.includes(j.status));
     },
     counts() {
       const c = { todas: 0, nova: 0, guardada: 0, candidatei: 0, descartada: 0, cortadas: this.cut.length };
       for (const j of this.visible) {
-        c[j.status] = (c[j.status] || 0) + 1;
-        if (j.status !== "descartada") c.todas++;
+        c[this.tabOf(j)]++;
+        if (!["descartada", "rejeitada"].includes(j.status)) c.todas++;
       }
       return c;
     },
@@ -474,7 +492,7 @@ createApp({
       if (this.tab === "cortadas") return [];
       const q = this.normalize(this.query);
       let list = this.visible.filter((j) => {
-        if (this.tab === "todas" ? j.status === "descartada" : j.status !== this.tab) return false;
+        if (this.tab === "todas" ? ["descartada", "rejeitada"].includes(j.status) : this.tabOf(j) !== this.tab) return false;
         if (this.source && j.source !== this.source) return false;
         if (j.score < this.minScore) return false;
         if (this.minSalary && !(j.salary && j.salary.max >= this.minSalary)) return false;
@@ -507,6 +525,20 @@ createApp({
     },
     brokenSources() {
       return new Set(this.health.map((h) => h.source));
+    },
+    // the Applications tab's summary: how your applications went
+    stats() {
+      const applied = this.jobs.filter((j) => APPLIED.includes(j.status));
+      const n = (status) => applied.filter((j) => j.status === status).length;
+      const replied = applied.length - n("candidatei");
+      return [
+        { label: this.t("Candidaturas"), value: applied.length },
+        { label: this.t("Entrevistas"), value: n("entrevista") },
+        { label: this.t("Ofertas"), value: n("oferta") },
+        { label: this.t("Rejeitadas"), value: n("rejeitada") },
+        { label: this.t("Sem resposta"), value: n("candidatei") },
+        { label: this.t("Taxa de resposta"), value: applied.length ? Math.round((100 * replied) / applied.length) + "%" : "–" },
+      ];
     },
   },
 
@@ -609,14 +641,16 @@ createApp({
     },
 
     async setStatus(job, status) {
-      const next = job.status === status ? "nova" : status;
+      const off = APPLIED.includes(status) && status !== "candidatei" ? "candidatei" : "nova";
+      const next = job.status === status ? off : status;
       const previous = job.status;
       job.status = next;
       try {
-        await this.api(`/api/jobs/${encodeURIComponent(job.uid)}`, {
+        const saved = await this.api(`/api/jobs/${encodeURIComponent(job.uid)}`, {
           method: "PATCH",
           body: JSON.stringify({ status: next }),
         });
+        job.applied_at = saved.applied_at;
       } catch (e) {
         job.status = previous;
         this.showToast(this.t("Não foi possível guardar: {error}", { error: e.message }));
@@ -635,8 +669,8 @@ createApp({
       }
     },
 
-    // kind: "message" (application message) or "interview" (interview prep), same endpoint name;
-    // language: "pt" or "en" to choose the message's language (by default, the posting's)
+    // kind: "message" (application message), "followup", "interview" or "cv", same endpoint name;
+    // language: "pt" or "en" to choose a message's language (by default, the posting's)
     async generate(job, kind, language) {
       job[kind + "Busy"] = true;
       job[kind + "Error"] = "";
@@ -644,12 +678,32 @@ createApp({
         const query = language ? `?language=${language}` : "";
         const { text } = await this.api(`/api/jobs/${encodeURIComponent(job.uid)}/${kind}${query}`, { method: "POST" });
         job[kind] = text;
-        if (language) job.messageLanguage = language; // "Another version" keeps it
+        if (language) job[kind + "Language"] = language; // "Another version" keeps it
       } catch (e) {
         job[kind + "Error"] = this.t("Não foi possível gerar: {error}", { error: e.message });
       } finally {
         job[kind + "Busy"] = false;
       }
+    },
+
+    tabOf(job) {
+      return APPLIED.includes(job.status) ? "candidatei" : job.status;
+    },
+
+    inApplications(job) {
+      return APPLIED.includes(job.status);
+    },
+
+    // days since you applied with no news (still "Applied"): from FOLLOW_UP_DAYS, the card reminds you
+    waitingDays(job) {
+      if (job.status !== "candidatei" || !job.applied_at) return 0;
+      const days = Math.floor((Date.now() - new Date(job.applied_at).getTime()) / 86400000);
+      return days >= FOLLOW_UP_DAYS ? days : 0;
+    },
+
+    followUp(job) {
+      job.descOpen = true; // the email shows under the description
+      this.generate(job, "followup", job.followupLanguage);
     },
 
     healthText(h) {

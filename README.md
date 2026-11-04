@@ -78,6 +78,7 @@ LinkedIn, Indeed and Glassdoor are left out on purpose (see [Limitations](#limit
 - **Warns when a source looks broken**: an error, or no jobs, in its last 3 searches (sites change their pages), or never a single job (maybe none in your area).
 - **Learns from your choices**: the AI score gets the jobs you applied to or saved, and the ones you discarded, as examples.
 - **Tracks your applications**: mark jobs as saved, applied (with the date) or discarded, and keep notes apart from the description. Jobs you find elsewhere (LinkedIn, a friend…) can be added by hand.
+- **Follows them up**: an application moves on to interview, offer or rejected, and the Applied tab sums up how they went (reply rate included). After 7 days with no reply, the card reminds you and the AI writes a short follow-up email. A job the company takes down and posts again keeps your status and notes.
 - **Adds a job from its link**: paste it in **+ Add job** and **Read from link** fills in the title, company, place, date and description (not LinkedIn, Indeed or Glassdoor).
 - **Exports to CSV** (⬇): your applications, saved and discarded jobs and notes, in a sheet for Excel.
 - **Spots jobs that closed**: when a job disappears from its source, it's marked as no longer published.

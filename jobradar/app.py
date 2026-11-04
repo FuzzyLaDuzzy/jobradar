@@ -252,7 +252,8 @@ def create_app(
     @app.get("/api/export.csv")
     def export_csv():
         """Your applications and the jobs you saved, discarded or wrote notes about, for Excel (";", as in Portugal)."""
-        names = {"nova": t("Nova"), "guardada": t("Guardada"), "candidatei": t("Candidatei"), "descartada": t("Descartada")}
+        names = {"nova": t("Nova"), "guardada": t("Guardada"), "candidatei": t("Candidatei"), "entrevista": t("Entrevista"),
+                 "oferta": t("Oferta"), "rejeitada": t("Rejeitada"), "descartada": t("Descartada")}
         out = io.StringIO()
         writer = csv.writer(out, delimiter=";")
         writer.writerow([t("Estado"), t("Empresa"), t("Vaga"), t("Localização"), t("Salário"), t("Fonte"), t("Link"),
@@ -397,6 +398,11 @@ def create_app(
     def job_message(uid: str, language: Literal["pt", "en"] | None = None):
         """language: the draft's "Rewrite in…" button; by default the message follows the posting."""
         return ai_text(uid, lambda job, cfg, client: message.write(job, cfg, client, language))
+
+    @app.post("/api/jobs/{uid:path}/followup")
+    def job_follow_up(uid: str, language: Literal["pt", "en"] | None = None):
+        """The follow-up email for an application with no reply yet; the language works as in the message."""
+        return ai_text(uid, lambda job, cfg, client: message.follow_up(job, cfg, client, language))
 
     @app.post("/api/jobs/{uid:path}/interview")
     def job_interview(uid: str):

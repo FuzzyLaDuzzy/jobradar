@@ -154,15 +154,40 @@ WRITE_IN = {"pt": "Escreve a mensagem toda em português europeu: assunto, sauda
             "en": "Write the whole message in English: subject, greeting, body and sign-off."}
 
 
-def write(job: dict, cfg: dict, client=None, language: str | None = None) -> str:
+def _in_language(system: str, ask: str, language: str | None) -> tuple[str, str]:
     """language: "pt" or "en" to choose it (the draft's button); by default, the posting's language."""
-    system, ask = SYSTEM, "Escreve a mensagem de candidatura para esta vaga."
     if language in WRITE_IN:  # the rule is replaced: a second, contradicting one could lose
         name = INTERVIEW_LANGUAGES[language][0]
-        system = SYSTEM.replace(POSTING_LANGUAGE, f"- Escreve em {name}, seja qual for a língua do anúncio.")
+        system = system.replace(POSTING_LANGUAGE, f"- Escreve em {name}, seja qual for a língua do anúncio.")
         ask += "\n" + WRITE_IN[language]
+    return system, ask
+
+
+def write(job: dict, cfg: dict, client=None, language: str | None = None) -> str:
+    system, ask = _in_language(SYSTEM, "Escreve a mensagem de candidatura para esta vaga.", language)
     prompt = _prompt(job, cfg.get("profile") or {}, ask)
     return _generate(system, prompt, cfg, client)
+
+
+FOLLOW_UP_SYSTEM = """Escreves um email curto de seguimento (follow-up) para uma candidatura que ainda não teve resposta.
+
+Regras:
+""" + POSTING_LANGUAGE + """
+- Curto: assunto e 3 a 5 frases. Educado e direto: lembra a candidatura e a data em que foi enviada, diz numa frase porque o perfil encaixa na vaga e pergunta se há novidades sobre o processo.
+- Usa só factos do perfil do candidato. Nunca inventes experiência, contactos anteriores nem conversas que não aconteceram.
+- Sem insistir nem pressionar: uma pergunta simples, e agradece a atenção.
+- Termina com a assinatura do perfil, tal como está; o que estiver entre parênteses retos fica para o candidato preencher.
+- Responde só com o email, em texto simples e sem markdown; a primeira linha é o assunto ("Subject: ..." ou "Assunto: ...").
+
+""" + DATA_RULE
+
+
+def follow_up(job: dict, cfg: dict, client=None, language: str | None = None) -> str:
+    """The follow-up email for an application with no reply yet (the reminder on the card)."""
+    sent = (job.get("applied_at") or "")[:10] or "(data não registada)"
+    system, ask = _in_language(FOLLOW_UP_SYSTEM, f"Escreve o email de seguimento desta candidatura, enviada a {sent}.",
+                               language)
+    return _generate(system, _prompt(job, cfg.get("profile") or {}, ask), cfg, client)
 
 
 def interview(job: dict, cfg: dict, client=None) -> str:

@@ -117,12 +117,15 @@
         {{ t('Mostrar mais ({n})', { n: cutFiltered.length - cutLimit }) }}
       </button>
     </section>
-    <div v-else-if="!loading && filtered.length === 0" class="empty">
+    <div v-if="tab === 'candidatei' && stats[0].value" class="stats">
+      <div v-for="st in stats" :key="st.label" class="stat"><b>{{ st.value }}</b><span>{{ st.label }}</span></div>
+    </div>
+    <div v-if="tab !== 'cortadas' && !loading && jobs.length && filtered.length === 0" class="empty">
       <h2>{{ t('Nenhuma vaga com estes filtros') }}</h2>
       <p>{{ t('Experimenta baixar o encaixe mínimo ou mudar de separador.') }}</p>
     </div>
 
-    <article v-for="j in filtered" :key="j.uid" class="card" :class="{ inactive: !j.active, done: j.status === 'candidatei' }">
+    <article v-for="j in filtered" :key="j.uid" class="card" :class="{ inactive: !j.active, done: inApplications(j), rejected: j.status === 'rejeitada' }">
       <div class="score" :class="scoreClass(j.score)" :title="scoreTitle(j)">
         <span>{{ j.score }}</span>
       </div>
@@ -149,6 +152,10 @@
           <span class="badge" v-if="j.work_model">{{ workModel(j.work_model) }}</span>
           <span class="badge pay" v-if="j.salary" :title="t('Salário indicado no anúncio')">💶 {{ j.salary.text }}</span>
           <span class="badge applied" v-if="j.applied_at">{{ t('Candidatei-me a {date}', { date: shortDate(j.applied_at) }) }}</span>
+          <button class="badge warn nudge" v-if="waitingDays(j)" @click="followUp(j)" :disabled="j.followupBusy">
+            {{ t('Sem resposta há {n} dias: escrever follow-up', { n: waitingDays(j) }) }}
+          </button>
+          <span class="badge" v-if="j.flags.reposted" :title="t('A empresa voltou a publicar esta vaga: o estado e as notas passaram para aqui.')">{{ t('Republicada') }}</span>
           <span class="badge warn" v-if="j.flags.years_required >= 2">{{ t('Pede {n}+ anos', { n: j.flags.years_required }) }}</span>
           <span class="badge warn" v-if="!j.active">{{ t('Já não está publicada') }}</span>
         </div>
@@ -160,7 +167,7 @@
           <textarea v-model="j.notes" @change="saveNotes(j)" :aria-label="t('Notas')"
                     :placeholder="t('Notas (ex.: enviei o CV a 30/10, contacto da recrutadora…)')"></textarea>
         </details>
-        <details>
+        <details :open="j.descOpen" @toggle="j.descOpen = $event.target.open">
           <summary>{{ t('Descrição') }}</summary>
           <p class="desc" v-if="j.description">{{ j.description }}</p>
           <p class="desc muted" v-else>{{ t('Sem descrição. Abre a vaga para ver os detalhes.') }}</p>
@@ -169,6 +176,10 @@
               <button class="btn" @click="generate(j, 'message', j.messageLanguage)" :disabled="j.messageBusy">
                 <span v-if="j.messageBusy" class="spinner"></span>
                 {{ j.messageBusy ? t('A escrever…') : (j.message ? t('↻ Outra versão da mensagem') : t('✉ Gerar mensagem de candidatura')) }}
+              </button>
+              <button class="btn" v-if="j.status === 'candidatei'" @click="followUp(j)" :disabled="j.followupBusy">
+                <span v-if="j.followupBusy" class="spinner"></span>
+                {{ j.followupBusy ? t('A escrever…') : (j.followup ? t('↻ Outro email de seguimento') : t('✉ Email de seguimento')) }}
               </button>
               <button class="btn" @click="generate(j, 'interview')" :disabled="j.interviewBusy">
                 <span v-if="j.interviewBusy" class="spinner"></span>
@@ -179,15 +190,15 @@
                 {{ j.cvBusy ? t('A analisar…') : (j.cv ? t('↻ Analisar de novo') : t('🧩 Ajustar o CV')) }}
               </button>
             </div>
-            <template v-for="kind in ['message', 'interview', 'cv']" :key="kind">
+            <template v-for="kind in ['message', 'followup', 'interview', 'cv']" :key="kind">
               <p class="alert" v-if="j[kind + 'Error']">{{ j[kind + 'Error'] }}</p>
               <template v-if="j[kind]">
                 <textarea class="ai-text" v-model="j[kind]"
-                          :aria-label="kind === 'message' ? t('Rascunho da mensagem') : kind === 'cv' ? t('Ajustes ao CV') : t('Preparação da entrevista')"></textarea>
+                          :aria-label="kind === 'message' ? t('Rascunho da mensagem') : kind === 'followup' ? t('Email de seguimento') : kind === 'cv' ? t('Ajustes ao CV') : t('Preparação da entrevista')"></textarea>
                 <button class="btn" @click="copyText(j[kind])">{{ t('Copiar') }}</button>
-                <button class="btn" v-if="kind === 'message'" :disabled="j.messageBusy"
-                        @click="generate(j, 'message', otherLanguage(j.message))">
-                  {{ otherLanguage(j.message) === 'en' ? t('Reescrever em inglês') : t('Reescrever em português') }}
+                <button class="btn" v-if="kind === 'message' || kind === 'followup'" :disabled="j[kind + 'Busy']"
+                        @click="generate(j, kind, otherLanguage(j[kind]))">
+                  {{ otherLanguage(j[kind]) === 'en' ? t('Reescrever em inglês') : t('Reescrever em português') }}
                 </button>
               </template>
             </template>
@@ -199,6 +210,11 @@
         <a class="btn" :href="j.url" target="_blank" rel="noopener">{{ t('Abrir ↗') }}</a>
         <button class="btn" :class="{ on: j.status === 'guardada' }" @click="setStatus(j, 'guardada')">{{ t('★ Guardar') }}</button>
         <button class="btn" :class="{ on: j.status === 'candidatei' }" @click="setStatus(j, 'candidatei')">{{ t('✓ Candidatei-me') }}</button>
+        <template v-if="inApplications(j)">
+          <button class="btn" :class="{ on: j.status === 'entrevista' }" @click="setStatus(j, 'entrevista')">{{ t('🎤 Entrevista') }}</button>
+          <button class="btn" :class="{ on: j.status === 'oferta' }" @click="setStatus(j, 'oferta')">{{ t('🏆 Oferta') }}</button>
+          <button class="btn ghost" :class="{ on: j.status === 'rejeitada' }" @click="setStatus(j, 'rejeitada')">{{ t('⛔ Rejeitada') }}</button>
+        </template>
         <button class="btn ghost" :class="{ on: j.status === 'descartada' }" @click="setStatus(j, 'descartada')">{{ t('✕ Descartar') }}</button>
         <button class="btn ghost" v-if="canFollow(j)" @click="findCompany(j.company)"
                 :title="t('Procurar o site de carreiras da {company} e receber as vagas dela diretamente', { company: j.company })">{{ t('＋ Seguir empresa') }}</button>
