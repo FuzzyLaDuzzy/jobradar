@@ -33,6 +33,13 @@ def test_on_the_phone_only_the_apps_window_reaches_the_api(tmp_path):
     assert tc.get("/api/jobs").json() == []
 
 
+def test_the_page_is_checked_again_after_an_update(tmp_path):
+    tc, _ = client(tmp_path)
+    for path in ("/", "/static/app.js", "/static/style.css"):
+        assert tc.get(path).headers["cache-control"] == "no-cache", path
+    assert "cache-control" not in tc.get("/api/jobs").headers
+
+
 def test_on_a_computer_there_is_no_token(tmp_path):
     tc, _ = client(tmp_path)
     assert tc.get("/api/jobs").json() == []

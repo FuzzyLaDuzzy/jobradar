@@ -221,7 +221,11 @@ def create_app(
             return JSONResponse({"detail": t("Pedido recusado: vem de outro site.")}, status_code=403)
         if token and request.url.path.startswith("/api/") and not _same(request.cookies.get(TOKEN_COOKIE), token):
             return JSONResponse({"detail": t("Pedido recusado: vem de outra app.")}, status_code=403)
-        return await call_next(request)
+        response = await call_next(request)
+        if request.url.path == "/" or request.url.path.startswith("/static/"):
+            # ask again each time (a 304 when nothing changed): after an update, not last version's page
+            response.headers.setdefault("Cache-Control", "no-cache")
+        return response
 
     db = Database(db_path)
     refresh_lock = threading.Lock()

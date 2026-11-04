@@ -73,6 +73,7 @@ body {
 .brand h1 { margin: 0; font-size: 22px; letter-spacing: -.02em; }
 .brand p { margin: 0; color: var(--muted); font-size: 13.5px; }
 .top-actions { display: flex; align-items: center; gap: 10px; }
+.top-icons { display: flex; gap: 10px; }
 
 /* buttons */
 .btn {
@@ -329,6 +330,13 @@ details textarea.ai-text { min-height: 260px; }
   .score { width: 44px; height: 44px; font-size: 15px; }
   .actions { grid-column: 1 / -1; }
   .actions .btn { flex: 1 1 auto; }
-  .top-actions { width: 100%; justify-content: space-between; }
+  /* seven buttons don't fit a phone in one row: the search and the three small ones first, the rest
+     below; 160px keeps the next button off the first row */
+  .top-actions { width: 100%; flex-wrap: wrap; gap: 8px; }
+  .top-actions .btn:not(.icon) { flex: 1 1 auto; }
+  .top-actions .btn.primary { order: -2; flex: 1 1 160px; }
+  .top-icons { order: -1; gap: 8px; }
+  .top-actions > .muted { order: 1; flex: 1 1 100%; }
+  .tabs button { padding: 9px 9px 11px; }
   .source-chip .msg { max-width: 220px; }
 }

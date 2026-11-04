@@ -5,7 +5,7 @@ name: android
 # artifacts (jobradar-apk-arm64-v8a is the one for a phone).
 on:
   push:
-    paths: ["android/**", ".github/workflows/android.yml"]
+    paths: ["android/**", "jobradar/**", "config.example.yaml", ".github/workflows/android.yml"]  # the APK carries jobradar/
   workflow_dispatch:
 
 concurrency:
