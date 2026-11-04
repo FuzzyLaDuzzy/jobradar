@@ -46,6 +46,9 @@ jobs:
           restore-keys: |
             p4a-${{ matrix.arch }}-${{ hashFiles('android/buildozer.spec') }}-
             p4a-${{ matrix.arch }}-
+      # python-for-android makes a venv for its pip installs and doesn't expect one to be there already:
+      # making it over the cached one puts the bundled pip back over the upgraded one, half-mixed
+      - run: rm -rf android/.buildozer/android/platform/build-*/build/venv
       - run: sudo apt-get update && sudo apt-get install -y autoconf automake libtool libltdl-dev pkg-config zlib1g-dev libncurses-dev libffi-dev libssl-dev cmake zip unzip
       # buildozer brings the Cython it needs (<3.0); python-for-android builds its own tools for the APK
       - run: pip install buildozer==1.6.0 2>&1 | tee android/build.log
