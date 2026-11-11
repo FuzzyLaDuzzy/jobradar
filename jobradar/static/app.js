@@ -338,6 +338,17 @@ const EN = {
   "Não foi possível guardar o perfil: {error}": "Couldn't save the profile: {error}",
   "Não foi possível abrir o perfil: {error}": "Couldn't open the profile: {error}",
   "O CV tem mais de 5 MB.": "The CV is larger than 5 MB.",
+  // ⚡ triage: the new jobs one at a time
+  "{n} vagas novas por decidir": "{n} new jobs to decide on",
+  "Triagem rápida": "Quick triage",
+  "Triagem": "Triage",
+  "{i} de {n}": "{i} of {n}",
+  "Saltar": "Skip",
+  "Desfazer": "Undo",
+  "No telemóvel, desliza a vaga: para a direita guarda, para a esquerda descarta.": "On a phone, swipe the job: right saves it, left discards it.",
+  "Acabaste a triagem": "Triage done",
+  "{saved} guardadas · {discarded} descartadas · {applied} candidaturas · {skipped} saltadas": "{saved} saved · {discarded} discarded · {applied} applied · {skipped} skipped",
+  "Ver as guardadas": "See saved jobs",
   // score reasons, stored in Portuguese by jobradar/scoring.py
   "júnior/estágio": "junior/internship",
   "estágio profissional": "professional internship",
@@ -462,6 +473,8 @@ createApp({
       readingCv: false,
       cvOver: false,
       toast: "",
+      // ⚡ triage: the new jobs one at a time; history: what was decided, for Undo; dx: how far a finger dragged the card
+      triage: { open: false, queue: [], index: 0, history: [], dir: "", dx: 0, startX: null },
     };
   },
 
@@ -538,6 +551,17 @@ createApp({
     },
     brokenSources() {
       return new Set(this.health.map((h) => h.source));
+    },
+    // the new jobs still to decide on, best first: what the ⚡ triage goes through
+    triageJobs() {
+      return this.visible.filter((j) => j.status === "nova" && j.active).sort((a, b) => b.score - a.score);
+    },
+    triageJob() {
+      return this.triage.queue[this.triage.index] || null;
+    },
+    triageTally() {
+      const n = (status) => this.triage.history.filter((h) => h.status === status).length;
+      return { saved: n("guardada"), discarded: n("descartada"), applied: n("candidatei"), skipped: n(null) };
     },
     // the Applications tab's summary: how your applications went
     stats() {
@@ -692,6 +716,73 @@ createApp({
         job.status = previous;
         this.showToast(this.t("Não foi possível guardar: {error}", { error: e.message }));
       }
+    },
+
+    openTriage() {
+      this.triage = { open: true, queue: [...this.triageJobs], index: 0, history: [], dir: "", dx: 0, startX: null };
+      this.$nextTick(() => this.$refs.triage && this.$refs.triage.focus());
+    },
+
+    closeTriage(tab) {
+      this.triage.open = false;
+      if (tab) this.tab = tab;
+    },
+
+    // the job on screen: "guardada", "descartada" or "candidatei"; null skips it (it stays new)
+    decide(status) {
+      const tr = this.triage;
+      const job = this.triageJob;
+      if (!job) return;
+      tr.dir = status === "descartada" ? "left" : status ? "right" : "up";
+      tr.dx = 0;
+      tr.history.push({ job, status });
+      tr.index++;
+      if (status) this.setStatus(job, status);
+    },
+
+    undoTriage() {
+      const tr = this.triage;
+      const last = tr.history.pop();
+      if (!last) return;
+      // the same status again puts the job back in New (setStatus toggles)
+      if (last.status && last.job.status === last.status) this.setStatus(last.job, last.status);
+      tr.dir = "back";
+      tr.index--;
+    },
+
+    triageKey(e) {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const keys = {
+        ArrowRight: () => this.decide("guardada"),
+        ArrowLeft: () => this.decide("descartada"),
+        ArrowDown: () => this.decide(null),
+        c: () => this.decide("candidatei"),
+        z: () => this.undoTriage(),
+        Backspace: () => this.undoTriage(),
+        o: () => this.triageJob && window.open(this.triageJob.url, "_blank", "noopener"),
+        Escape: () => this.closeTriage(),
+      };
+      const action = keys[e.key.length === 1 ? e.key.toLowerCase() : e.key];
+      if (!action) return;
+      e.preventDefault();
+      action();
+    },
+
+    // on a phone the card follows the finger: far enough right saves the job, left discards it
+    swipeStart(e) {
+      if (e.pointerType !== "mouse") this.triage.startX = e.clientX;
+    },
+
+    swipeMove(e) {
+      if (this.triage.startX !== null) this.triage.dx = e.clientX - this.triage.startX;
+    },
+
+    swipeEnd() {
+      const { dx } = this.triage;
+      this.triage.startX = null;
+      if (dx > 90) this.decide("guardada");
+      else if (dx < -90) this.decide("descartada");
+      else this.triage.dx = 0;
     },
 
     async saveNotes(job) {

@@ -74,6 +74,7 @@ LinkedIn, Indeed and Glassdoor are left out on purpose (see [Limitations](#limit
 - **Prepares you for the interview** (🎯): what the job is looking for, likely technical and behavioural questions with hints from your profile, your gaps against the posting, and questions to ask the company.
 - **Tailors your CV to each job** (🧩): which of your skills and projects to put first for that job, what it asks for that your profile doesn't show, and words from the posting worth using.
 - **Follows a company in one click** (＋): on a job from a job board, **＋ Follow company** looks for that company's careers site on ten platforms and, if JobRadar can read it, adds it to your sources, so its jobs come straight from the company with the full description.
+- **Goes through the new jobs one at a time** (⚡ Quick triage): best fit first, with the AI's reason and the description; → saves, ← discards, ↓ skips, C marks it applied and Z undoes. On a phone, swipe the job right or left. Each decision also teaches the AI scoring what you like.
 - **Shows what the jobs ask for** (📊 Market): the skills most asked for in the jobs it found, and which ones your profile already has, so you know what to learn next.
 - **Shows the salary** (💶) when the posting states one, and filters by it (per month; a yearly amount counts over 14 payments).
 - **Shows what the filters cut** (✂ Cut): every job the last search read and left out, with the reason, so a good job cut by mistake can still be saved; saving one offers the filter change that would have kept it, in one click.

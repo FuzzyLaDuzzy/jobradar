@@ -131,6 +131,10 @@
         {{ t('Mostrar mais ({n})', { n: cutFiltered.length - cutLimit }) }}
       </button>
     </section>
+    <div v-if="(tab === 'todas' || tab === 'nova') && triageJobs.length" class="triage-cta">
+      <span>{{ t('{n} vagas novas por decidir', { n: triageJobs.length }) }}</span>
+      <button class="btn primary" @click="openTriage">⚡ {{ t('Triagem rápida') }}</button>
+    </div>
     <div v-if="tab === 'candidatei' && stats[0].value" class="stats">
       <div v-for="st in stats" :key="st.label" class="stat"><b>{{ st.value }}</b><span>{{ st.label }}</span></div>
     </div>
@@ -319,6 +323,65 @@
         </li>
       </ul>
       <p class="muted small">{{ t('Quando aprenderes uma, acrescenta-a no 👤 Perfil: passa a dar pontos nas vagas que a pedem.') }}</p>
+    </div>
+  </div>
+
+  <!-- ⚡ triage: the new jobs one at a time, best first; keys or a swipe decide -->
+  <div class="modal" v-if="triage.open" @click.self="closeTriage()">
+    <div class="sheet triage" role="dialog" :aria-label="t('Triagem')" tabindex="-1" ref="triage" @keydown="triageKey">
+      <header>
+        <h2>⚡ {{ t('Triagem') }}</h2>
+        <span class="muted small" v-if="triageJob">{{ t('{i} de {n}', { i: triage.index + 1, n: triage.queue.length }) }}</span>
+        <button type="button" class="btn icon" @click="closeTriage()" :aria-label="t('Fechar')">✕</button>
+      </header>
+      <div class="progress-bar"><div :style="{ width: (100 * triage.index / triage.queue.length) + '%' }"></div></div>
+      <!-- the next job shows at once, under the one flying out: a key always decides on the job in view -->
+      <div class="triage-stage">
+      <transition :name="'fly-' + triage.dir">
+        <article v-if="triageJob" :key="triageJob.uid" class="triage-card"
+                 :class="{ dragging: triage.startX !== null, 'to-right': triage.dx > 40, 'to-left': triage.dx < -40 }"
+                 :style="{ '--dx': triage.dx + 'px', '--rot': triage.dx / 25 + 'deg' }"
+                 @pointerdown="swipeStart" @pointermove="swipeMove" @pointerup="swipeEnd" @pointercancel="swipeEnd">
+          <div class="title-row">
+            <div class="score" :class="scoreClass(triageJob.score)" :title="scoreTitle(triageJob)" :style="{ '--offset': 100 - triageJob.score }">
+              <svg viewBox="0 0 50 50" aria-hidden="true"><circle class="track" cx="25" cy="25" r="22"/><circle class="arc" cx="25" cy="25" r="22" pathLength="100"/></svg>
+              <span>{{ triageJob.score }}</span>
+            </div>
+            <div>
+              <a :href="triageJob.url" target="_blank" rel="noopener" class="title">{{ triageJob.title }}</a>
+              <div class="meta"><b>{{ triageJob.company }}</b> · {{ triageJob.location || t('Localização por confirmar') }} · {{ posted(triageJob) }}</div>
+            </div>
+          </div>
+          <div class="badges">
+            <span class="badge source">{{ sourceName(triageJob.source) }}</span>
+            <span class="badge" v-if="triageJob.contract">{{ triageJob.contract }}</span>
+            <span class="badge" v-if="triageJob.experience && triageJob.experience.toLowerCase() !== (triageJob.contract || '').toLowerCase()">{{ triageJob.experience }}</span>
+            <span class="badge" v-if="triageJob.work_model">{{ workModel(triageJob.work_model) }}</span>
+            <span class="badge pay" v-if="triageJob.salary" :title="t('Salário indicado no anúncio')">💶 {{ triageJob.salary.text }}</span>
+            <span class="badge warn" v-if="triageJob.flags.years_required >= 2">{{ t('Pede {n}+ anos', { n: triageJob.flags.years_required }) }}</span>
+          </div>
+          <p class="reason" v-if="triageJob.llm_reason">{{ triageJob.llm_reason }}</p>
+          <p class="reason muted" v-else-if="triageJob.reasons.length">{{ triageJob.reasons.map((r) => t(r)).join(' · ') }}</p>
+          <p class="desc" v-if="triageJob.description">{{ triageJob.description }}</p>
+          <p class="desc muted" v-else>{{ t('Sem descrição. Abre a vaga para ver os detalhes.') }}</p>
+        </article>
+        <div v-else class="triage-done" key="done">
+          <h3>{{ t('Acabaste a triagem') }}</h3>
+          <p class="muted">{{ t('{saved} guardadas · {discarded} descartadas · {applied} candidaturas · {skipped} saltadas', triageTally) }}</p>
+          <button type="button" class="btn primary" @click="closeTriage('guardada')">{{ t('Ver as guardadas') }}</button>
+        </div>
+      </transition>
+      </div>
+      <footer class="triage-actions" v-if="triageJob">
+        <button type="button" class="btn" @click="decide('descartada')">{{ t('✕ Descartar') }} <kbd>←</kbd></button>
+        <button type="button" class="btn ghost" @click="decide(null)">{{ t('Saltar') }} <kbd>↓</kbd></button>
+        <button type="button" class="btn" @click="decide('candidatei')">{{ t('✓ Candidatei-me') }} <kbd>C</kbd></button>
+        <button type="button" class="btn primary" @click="decide('guardada')">{{ t('★ Guardar') }} <kbd>→</kbd></button>
+      </footer>
+      <p class="triage-hint muted small">
+        <button type="button" class="btn ghost" :disabled="!triage.history.length" @click="undoTriage">↶ {{ t('Desfazer') }} <kbd>Z</kbd></button>
+        <span v-if="triageJob">{{ t('No telemóvel, desliza a vaga: para a direita guarda, para a esquerda descarta.') }}</span>
+      </p>
     </div>
   </div>
 

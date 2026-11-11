@@ -365,6 +365,51 @@ details textarea.ai-text { min-height: 260px; }
   details[open]::details-content { height: auto; }
 }
 
+/* ⚡ triage: the new jobs one at a time. The card follows a finger (--dx, --rot) and flies out to the side
+   it was sent to; the fly rules come after .triage-card so their transform wins */
+.triage-cta {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px;
+  background: var(--accent-soft); border: 1px solid var(--accent); border-radius: var(--radius);
+  padding: 10px 14px; margin-bottom: 12px; font-size: 14px;
+}
+.sheet.triage { width: min(620px, 100%); overflow: hidden; }
+.sheet.triage:focus { outline: none; }
+.sheet.triage header h2 { flex: 1; }
+.sheet.triage header { gap: 10px; }
+.triage-stage { position: relative; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+.triage-card {
+  flex: 1 1 auto; min-height: 0; overflow: hidden auto; touch-action: pan-y;
+  background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px;
+  transform: translateX(var(--dx, 0)) rotate(var(--rot, 0deg)); transition: transform .2s ease, border-color .2s ease;
+}
+.triage-card.dragging { transition: none; user-select: none; }
+.triage-card.to-right { border-color: var(--accent); }
+.triage-card.to-left { border-color: var(--warn); }
+.triage-card .title-row { flex-wrap: nowrap; align-items: flex-start; gap: 12px; }
+.triage-card .score { flex: none; }
+.sheet .triage-actions { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }  /* .sheet: over .sheet footer's flex */
+.triage-hint { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 0; }
+.triage-done { text-align: center; padding: 32px 10px; display: grid; gap: 10px; justify-items: center; }
+.triage-done h3 { margin: 0; }
+.triage kbd {
+  font: 11px ui-monospace, Consolas, monospace; color: var(--muted); border: 1px solid var(--border);
+  border-radius: 4px; padding: 0 4px; margin-left: 4px;
+}
+.triage .btn.primary kbd { color: inherit; border-color: currentColor; opacity: .75; }
+.fly-left-leave-active, .fly-right-leave-active, .fly-up-leave-active, .fly-back-leave-active {
+  position: absolute; inset: 0; z-index: 1; pointer-events: none;  /* over the next one, which is already there */
+  transition: transform .22s ease-in, opacity .22s ease-in;
+}
+.fly-left-leave-to { transform: translateX(-110%) rotate(-6deg); opacity: 0; }
+.fly-right-leave-to { transform: translateX(110%) rotate(6deg); opacity: 0; }
+.fly-up-leave-to { transform: translateY(-16px); opacity: 0; }
+.fly-back-leave-to { opacity: 0; }
+.fly-left-enter-active, .fly-right-enter-active, .fly-up-enter-active, .fly-back-enter-active {
+  transition: transform .2s ease-out, opacity .2s ease-out;
+}
+.fly-left-enter-from, .fly-right-enter-from, .fly-up-enter-from, .fly-back-enter-from { transform: scale(.97); opacity: 0; }
+@media (hover: none) { .triage kbd { display: none; } }
+
 /* fewer animations for those who asked for less movement in their system */
 @media (prefers-reduced-motion: reduce) {
   *, ::before, ::after { animation: none !important; transition: none !important; }
@@ -389,4 +434,5 @@ details textarea.ai-text { min-height: 260px; }
   .sources-summary { display: flex; }
   .sources { margin-top: 16px; }
   .source-chip .msg { max-width: 220px; }
+  .sheet .triage-actions { grid-template-columns: 1fr 1fr; }
 }
