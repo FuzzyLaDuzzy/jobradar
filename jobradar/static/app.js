@@ -4,7 +4,7 @@ const STORAGE_KEY = "jobradar.filters";
 const SOURCE_NAMES = {
   itjobs: "ITJobs", sysmatch: "Sysmatch", landingjobs: "Landing.jobs", netempregos: "Net-Empregos", randstad: "Randstad",
   manual: "Adicionada por ti", balancasmarques: "Balanças Marques", workable: "Workable", workinbraga: "Work in Braga",
-  smartrecruiters_search: "SmartRecruiters",
+  smartrecruiters_search: "SmartRecruiters", iefp: "IEFP",
 };
 const WORK_MODELS = { remote: "Remoto", hybrid: "Híbrido", "on-site": "Presencial", onsite: "Presencial" };
 const EMPTY_JOB = () => ({ title: "", company: "", url: "", location: "", notes: "", description: "", posted_at: "" });

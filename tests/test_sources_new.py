@@ -1,5 +1,5 @@
 """Recruitee (Mercedes-Benz.io), Zoho Recruit (Edigma), Eurotux, Teamtailor (Nutrium), Balanças Marques (with SDILAB),
-Workable (search by place), Work in Braga and Greenhouse (Sword Health),
+Workable (search by place), Work in Braga, IEFP (internships) and Greenhouse (Sword Health),
 from real answers cut down to a few fields."""
 
 import html
@@ -8,8 +8,8 @@ import json
 import httpx
 import pytest
 
-from jobradar.sources import (balancasmarques, eurotux, greenhouse, recruitee, smartrecruiters, teamtailor, with_area, workable,
-                              workinbraga, zohorecruit)
+from jobradar.sources import (balancasmarques, eurotux, greenhouse, iefp, recruitee, smartrecruiters, teamtailor, with_area,
+                              workable, workinbraga, zohorecruit)
 
 # --- Recruitee ---------------------------------------------------------------
 
@@ -362,3 +362,63 @@ def test_smartrecruiters_search_by_place(make_client):
     assert (java.contract, java.experience) == ("Full-time", "Entry Level")  # empty in the search, from the detail
     assert java.description == "Java and Spring."
     assert java.url == "https://jobs.smartrecruiters.com/Inetum/744000159365002-junior-java-developer"
+
+
+# --- IEFP (internships) -------------------------------------------------------
+
+def _iefp_card(offer_id, title, place, area, qualification):
+    return (f'<article class="card card-oferta" id="ofertacard_{offer_id}"><div class="card-header">'
+            f'<div class="col-xs-6">Oferta de Estágio</div><div class="col-xs-6 text-right">ID: {offer_id}</div>'
+            f'<div class="d-flex align-items-center"><strong>{title}</strong></div></div>'
+            f'<div class="card-body"><div class="text-uppercase"><i class="fa fa-map-marker"></i>Localização</div>'
+            f'<div><strong>   {place}   </strong></div>'
+            f'<div class="text-uppercase">Área de formação</div><div><strong><span class="text-capitalize">{area}</span></strong></div>'
+            f'<li>Habilitação: <span class="text-lowercase">   {qualification}  </span></li></div></article>')
+
+
+def _iefp_page(current, count, cards):
+    return (f'<input type="hidden" name="currentPage" value="{current}"><input type="hidden" name="pageCount" value="{count}">'
+            + "".join(cards))
+
+
+IEFP_PAGE_1 = _iefp_page(1, 2, [_iefp_card("1108747", "Programador de Software", "BRAGA", "Engenharia e Técnicas Afins", "Licenciatura"),
+                                _iefp_card("1104766", "Cozinheiro", "BRAGA", "Humanidades", "Ensino Secundário")])
+IEFP_PAGE_2 = _iefp_page(2, 2, [_iefp_card("1093249", "Analista de Sistemas", "BRAGA", "Engenharia e Técnicas Afins", "Licenciatura")])
+IEFP_DETAIL = ('<h3>  Programador de Software  (M/F)  </h3><div>  BRAGA - U.F. DE NOGUEIRA, FRAI&Atilde;O E LAMA&Ccedil;&Atilde;ES  </div>'
+               '<div class="text-muted text-uppercase">Duração</div><div><strong>   6 meses   </strong></div>'
+               '<div class="text-muted text-uppercase">Nível</div><div><strong>  6  </strong></div>'
+               '<div><small>Nº de Vagas</small></div><div class="fs-3">  1  </div>')
+
+
+def test_iefp_reads_every_page_and_details_only_for_kept(make_client):
+    seen = []
+
+    def handler(request):
+        body = request.content.decode()
+        seen.append(f"{request.method} {request.url.path}?{request.url.query.decode()} {body}".strip())
+        if request.url.path.endswith("/detalheOfertasEstagio.do"):
+            return httpx.Response(200, text=IEFP_DETAIL)
+        if request.method == "GET":
+            return httpx.Response(200, text="<form name=\"pesquisaForm\"></form>")  # opens the session
+        return httpx.Response(200, text=IEFP_PAGE_2 if "action=1" in body else IEFP_PAGE_1)
+
+    entry = with_area("iefp", {}, {"locations": ["braga"]})
+    jobs = iefp.fetch(make_client(handler), entry, prefilter=lambda job: "Programador" in job.title)
+    assert [j.title for j in jobs] == ["Programador de Software", "Cozinheiro", "Analista de Sistemas"]
+    assert seen[0] == "GET /IEFP/pesquisas/search.do?cat=ofertaEstagio"
+    assert "concelho_facet=BRAGA" in seen[1] and "action" not in seen[1]
+    assert "action=1" in seen[2] and "currentPage=1" in seen[2]  # the next page: the last answer's page
+    assert seen[3] == "GET /IEFP/pesquisas/detalheOfertasEstagio.do?idOferta=1108747"
+    assert len(seen) == 4  # no detail for the cook nor for the job the prefilter left out
+    job = jobs[0]
+    assert (job.uid, job.company, job.location) == ("iefp:1108747", "IEFP (entidade não divulgada)", "Braga")
+    assert (job.contract, job.experience, job.posted_at) == ("Estágio profissional · 6 meses", "Licenciatura (nível 6)", None)
+    assert job.url == "https://iefponline.iefp.pt/IEFP/pesquisas/detalheOfertasEstagio.do?idOferta=1108747"
+    assert "Engenharia e Técnicas Afins" in job.description and "FRAIÃO E LAMAÇÃES" in job.description
+    assert "Vagas: 1." in job.description
+    assert jobs[2].contract == "Estágio profissional" and jobs[2].experience == "Licenciatura"  # list data only
+
+
+def test_iefp_place_names():
+    [job] = iefp.parse_list(_iefp_card("1", "Rececionista", "VIANA DO CASTELO", "Turismo", "Licenciatura"))
+    assert job.location == "Viana do Castelo"

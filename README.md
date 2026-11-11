@@ -20,6 +20,7 @@ Out of the box ([`config.example.yaml`](config.example.yaml)) it reads these job
 | **Workable** (every company on Workable, searched in your area) | Public job search |
 | **SmartRecruiters** (every company on SmartRecruiters, searched in your area) | Public job search |
 | **Work in Braga** (InvestBraga's job board, where companies post themselves) | Its jobs page |
+| **IEFP** (professional internships of the public employment service, in your area's municipality) | Public search form |
 
 | Company | Platform |
 |---|---|
@@ -63,6 +64,7 @@ LinkedIn, Indeed and Glassdoor are left out on purpose (see [Limitations](#limit
   - **ITJobs.pt**, the main Portuguese IT job board (free read-only key)
   - **Landing.jobs**, **Net-Empregos** and **Randstad**, through their official feeds
   - **Sysmatch**, **Work in Braga**, **Eurotux** and **Balanças Marques** (with SDILAB), from their jobs pages
+  - **IEFP**'s professional internships (estágios profissionais) in your area's municipality, from its public search; IEFP shows the employer only to the candidates
   - **Workable**'s and **SmartRecruiters**' public job searches, in your area: every company that hires through them, even the ones you've never heard of
   - **Company careers sites** on SmartRecruiters, Lever, Workday, SAP SuccessFactors, BambooHR, Recruitee, Zoho Recruit, Teamtailor and Greenhouse, from companies all over Portugal (Bosch, Farfetch, Accenture, Deloitte, Devoteam, Feedzai, Sword Health, Cloudflare, Celfocus… or any company you add); each keeps only the jobs in your area
 - **Filters** by your area, the kind of job (words the title must have), your level (junior words, senior words to skip), excluded words and companies, job age and typical scam signs. When a source doesn't say where the job is, it looks for the city in the description; when the title names a city outside your area ("Lisbon Based", "Relocate to…"), the title wins.

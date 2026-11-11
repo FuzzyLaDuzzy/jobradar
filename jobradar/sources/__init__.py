@@ -1,6 +1,6 @@
 """Source connectors. Each `fetch(client, entry, prefilter)` returns a list of Jobs."""
 
-from . import (balancasmarques, bamboohr, eurotux, greenhouse, itjobs, landingjobs, lever, netempregos, randstad, recruitee, smartrecruiters,
+from . import (balancasmarques, bamboohr, eurotux, greenhouse, iefp, itjobs, landingjobs, lever, netempregos, randstad, recruitee, smartrecruiters,
                successfactors, sysmatch, teamtailor, workable, workday, workinbraga, zohorecruit)
 from .base import SourceSkipped, make_client
 
@@ -24,6 +24,7 @@ FETCHERS = {
     "balancasmarques": balancasmarques.fetch,
     "workable": workable.fetch,
     "workinbraga": workinbraga.fetch,
+    "iefp": iefp.fetch,
 }
 
 # Which config field names each entry (used in the source label).
@@ -47,6 +48,7 @@ LABEL_FIELD = {
     "balancasmarques": None,
     "workable": None,
     "workinbraga": None,
+    "iefp": None,
 }
 
 REQUIRED_FIELDS = {
@@ -69,6 +71,7 @@ REQUIRED_FIELDS = {
     "balancasmarques": [],
     "workable": [],
     "workinbraga": [],
+    "iefp": [],
 }
 
 
@@ -81,6 +84,7 @@ def with_area(kind: str, entry: dict, search: dict, sources: dict | None = None)
         "workday": {"search": places},
         "successfactors": {"location": places},
         "workable": {"location": places},
+        "iefp": {"location": places},
         "smartrecruiters_search": {"keyword": places,
                                    "skip": [e.get("company", "") for e in (sources or {}).get("smartrecruiters") or []]},
         "itjobs": {"location_names": search.get("locations") or []},

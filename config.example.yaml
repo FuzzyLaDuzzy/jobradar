@@ -96,6 +96,8 @@ sources:
       logo: https://www.google.com/s2/favicons?domain=balancasmarques.com&sz=128
   workinbraga:                # workinbraga.pt, InvestBraga's job board (Braga only): companies post there (Checkmarx too)
     - {}
+  iefp:                       # iefponline.iefp.pt: IEFP's professional internships (ATIVAR.PT) in the area's municipality; no company or date
+    - {}
   zohorecruit:               # Zoho Recruit careers sites (careers.<company>.../jobs/Careers)
     - name: Edigma
       url: https://careers.edigma.com/jobs/Careers
