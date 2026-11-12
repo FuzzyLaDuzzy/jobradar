@@ -26,23 +26,24 @@
       </div>
     </div>
     <div class="top-actions">
-      <span class="muted small" v-if="scoringNow"><span class="spinner"></span> {{ t('A IA está a avaliar as vagas novas…') }}</span>
-      <span class="muted small" v-else-if="lastRefresh">{{ t('Atualizado {when}', { when: relative(lastRefresh) }) }}</span>
-      <button class="btn" @click="openMarket">📊 {{ t('Mercado') }}</button>
-      <button class="btn" @click="openProfile()">👤 {{ t('Perfil') }}</button>
-      <button class="btn" @click="openAddJob">{{ t('+ Adicionar vaga') }}</button>
       <button class="btn primary" :disabled="refreshing" @click="refresh">
         <span v-if="refreshing" class="spinner"></span>
         {{ refreshing ? t('A procurar…') : t('Procurar vagas') }}
       </button>
-      <span class="top-icons">
-      <button class="btn icon" @click="changeLanguage(lang === 'pt' ? 'en' : 'pt')"
-              :aria-label="lang === 'pt' ? 'Switch to English' : 'Mudar para português'">{{ lang === 'pt' ? 'EN' : 'PT' }}</button>
-      <button class="btn icon" @click="setTheme(darkNow ? 'light' : 'dark')"
-              :title="darkNow ? t('Mudar para tema claro') : t('Mudar para tema escuro')"
-              :aria-label="darkNow ? t('Mudar para tema claro') : t('Mudar para tema escuro')">{{ darkNow ? '☀' : '☾' }}</button>
-      <button class="btn icon" @click="openSettings" :title="t('Definições')" :aria-label="t('Definições')">⚙</button>
-      </span>
+      <!-- everything else, one tap away: a click anywhere (an item too) or Esc closes it -->
+      <div class="menu-wrap">
+        <button class="btn" @click.stop="menuOpen = !menuOpen" :aria-expanded="menuOpen" aria-haspopup="true">☰ {{ t('Menu') }}</button>
+        <div class="menu" v-if="menuOpen">
+          <button @click="openMarket">📊 {{ t('Mercado') }}</button>
+          <button @click="openProfile()">👤 {{ t('Perfil') }}</button>
+          <button @click="openAddJob">{{ t('+ Adicionar vaga por link') }}</button>
+          <a href="/api/export.csv" :title="t('As tuas candidaturas, guardadas, descartadas e notas, numa folha para o Excel')">{{ t('⬇ Exportar CSV') }}</a>
+          <hr>
+          <button @click="changeLanguage(lang === 'pt' ? 'en' : 'pt')">🌐 {{ lang === 'pt' ? 'English' : 'Português' }}</button>
+          <button @click="setTheme(darkNow ? 'light' : 'dark')">{{ darkNow ? '☀ ' + t('Tema claro') : '☾ ' + t('Tema escuro') }}</button>
+          <button @click="openSettings">⚙ {{ t('Definições') }}</button>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -52,24 +53,14 @@
     <span class="muted" v-if="progress.total && progress.waiting.length && progress.waiting.length <= 4">· {{ t('ainda a ler {names}', { names: progress.waiting.map(sourceName).join(', ') }) }}</span>
   </div>
 
-  <section class="sources" v-if="runs.length">
-    <button class="sources-summary" @click="sourcesOpen = !sourcesOpen" :aria-expanded="sourcesOpen">
-      {{ t('{n} fontes', { n: runs.length }) }} · {{ t('{kept} relevantes de {fetched}', { kept: runTotals.kept, fetched: runTotals.fetched }) }}<b v-if="runTotals.new">{{ t(' · {n} novas', { n: runTotals.new }) }}</b>
-      <span class="failing" v-if="runTotals.errors">· {{ t('{n} com erro', { n: runTotals.errors }) }}</span>
-      <span aria-hidden="true">{{ sourcesOpen ? '▴' : '▾' }}</span>
-    </button>
-    <div v-for="r in runs" v-show="sourcesOpen" :key="r.source" class="source-chip" :class="[r.status, { broken: brokenSources.has(r.source) }]">
-      <span class="dot"></span>
-      <strong>{{ sourceName(r.source) }}</strong>
-      <span v-if="r.status === 'ok'">{{ t('{kept} relevantes de {fetched}', { kept: r.kept, fetched: r.fetched }) }}<b v-if="r.new">{{ t(' · {n} novas', { n: r.new }) }}</b></span>
-      <span v-else class="msg" :title="r.message">{{ r.status === 'skipped' ? r.message : t('Erro: {error}', { error: r.message }) }}</span>
-    </div>
-  </section>
-  <div class="health" v-if="health.length">
-    <b>⚠ {{ t('Fontes que parecem avariadas') }}</b>
-    <ul><li v-for="h in health" :key="h.source">{{ healthText(h) }}</li></ul>
-    <p class="muted small">{{ t('Se for normal (a fonte não tem vagas na tua zona), podes tirá-la das fontes no ⚙.') }}</p>
-  </div>
+  <!-- the sources in one line: the list, sorted, in its own window -->
+  <button class="sources-line" v-if="runs.length || scoringNow" @click="sourcesOpen = true">
+    <span v-if="scoringNow"><span class="spinner"></span> {{ t('A IA está a avaliar as vagas novas…') }}</span>
+    <span v-else-if="lastRefresh">{{ t('Atualizado {when}', { when: relative(lastRefresh) }) }}</span>
+    <span>· {{ t('{n} fontes', { n: runs.length }) }} · {{ t('{n} relevantes', { n: runTotals.kept }) }}<b v-if="runTotals.new">{{ t(' · {n} novas', { n: runTotals.new }) }}</b></span>
+    <span class="failing" v-if="failingSources.size">· ⚠ {{ t('{n} com problemas', { n: failingSources.size }) }}</span>
+    <span aria-hidden="true">▸</span>
+  </button>
 
   <nav class="tabs" :aria-label="t('Estado das vagas')">
     <button v-for="tb in tabs" :key="tb.key" :class="{ active: tab === tb.key }" @click="tab = tb.key">
@@ -79,6 +70,10 @@
 
   <section class="toolbar">
     <input class="search" type="search" v-model="query" :placeholder="t('Pesquisar título, empresa ou tecnologia…')">
+    <button class="btn" :class="{ on: activeFilters }" @click="filtersOpen = !filtersOpen" :aria-expanded="filtersOpen">
+      {{ t('Filtros') }}<template v-if="activeFilters"> · {{ activeFilters }}</template> <span aria-hidden="true">{{ filtersOpen ? '▴' : '▾' }}</span>
+    </button>
+    <div class="filters" v-show="filtersOpen">
     <select v-model="source" :aria-label="t('Fonte')">
       <option value="">{{ t('Todas as fontes') }}</option>
       <option v-for="s in sources" :key="s" :value="s">{{ sourceName(s) }}</option>
@@ -98,7 +93,7 @@
              :aria-label="t('Salário mínimo por mês')">
     </label>
     <label class="check"><input type="checkbox" v-model="showInactive"> {{ t('Mostrar indisponíveis') }}</label>
-    <a class="btn ghost" href="/api/export.csv" :title="t('As tuas candidaturas, guardadas, descartadas e notas, numa folha para o Excel')">{{ t('⬇ Exportar CSV') }}</a>
+    </div>
   </section>
 
   <main>
@@ -165,7 +160,7 @@
           <b>{{ j.company }}</b> · {{ j.location || t('Localização por confirmar') }} · {{ posted(j) }}
         </div>
         <div class="badges">
-          <span class="badge source">{{ sourceName(j.source) }}</span>
+          <span class="badge source" v-if="!sourceIsCompany(j)">{{ sourceName(j.source) }}</span>
           <a v-for="o in j.also_on" :key="o.source + o.url" class="badge source" :href="o.url" target="_blank"
              rel="noopener">{{ t('também em {source}', { source: sourceName(o.source) }) }} ↗</a>
           <span class="badge" v-if="j.contract">{{ j.contract }}</span>
@@ -210,6 +205,8 @@
                 <span v-if="j.cvBusy" class="spinner"></span>
                 {{ j.cvBusy ? t('A analisar…') : (j.cv ? t('↻ Analisar de novo') : t('🧩 Ajustar o CV')) }}
               </button>
+              <button class="btn" v-if="canFollow(j)" @click="findCompany(j.company)"
+                      :title="t('Procurar o site de carreiras da {company} e receber as vagas dela diretamente', { company: j.company })">{{ t('＋ Seguir empresa') }}</button>
             </div>
             <template v-for="kind in ['message', 'followup', 'interview', 'cv']" :key="kind">
               <p class="alert" v-if="j[kind + 'Error']">{{ j[kind + 'Error'] }}</p>
@@ -229,16 +226,11 @@
 
       <div class="actions">
         <a class="btn" :href="j.url" target="_blank" rel="noopener">{{ t('Abrir ↗') }}</a>
-        <button class="btn" :class="{ on: j.status === 'guardada' }" @click="setStatus(j, 'guardada')">{{ t('★ Guardar') }}</button>
-        <button class="btn" :class="{ on: j.status === 'candidatei' }" @click="setStatus(j, 'candidatei')">{{ t('✓ Candidatei-me') }}</button>
-        <template v-if="inApplications(j)">
-          <button class="btn" :class="{ on: j.status === 'entrevista' }" @click="setStatus(j, 'entrevista')">{{ t('🎤 Entrevista') }}</button>
-          <button class="btn" :class="{ on: j.status === 'oferta' }" @click="setStatus(j, 'oferta')">{{ t('🏆 Oferta') }}</button>
-          <button class="btn ghost" :class="{ on: j.status === 'rejeitada' }" @click="setStatus(j, 'rejeitada')">{{ t('⛔ Rejeitada') }}</button>
-        </template>
-        <button class="btn ghost" :class="{ on: j.status === 'descartada' }" @click="setStatus(j, 'descartada')">{{ t('✕ Descartar') }}</button>
-        <button class="btn ghost" v-if="canFollow(j)" @click="findCompany(j.company)"
-                :title="t('Procurar o site de carreiras da {company} e receber as vagas dela diretamente', { company: j.company })">{{ t('＋ Seguir empresa') }}</button>
+        <button class="btn" v-if="j.status === 'nova'" @click="setStatus(j, 'guardada')">{{ t('★ Guardar') }}</button>
+        <!-- the system's own menu: on a phone it opens the phone's list -->
+        <select class="status" :class="j.status" :value="j.status" @change="setStatus(j, $event.target.value)" :aria-label="t('Estado')">
+          <option v-for="s in statuses" :key="s.key" :value="s.key">{{ s.label }}</option>
+        </select>
       </div>
     </article>
     </transition-group>
@@ -302,6 +294,39 @@
         </ul>
         <p class="alert" v-if="follow.error">{{ follow.error }}</p>
       </template>
+    </div>
+  </div>
+
+  <div class="modal" v-if="sourcesOpen" @click.self="sourcesOpen = false">
+    <div class="sheet form" role="dialog" :aria-label="t('Fontes')">
+      <header>
+        <h2>{{ t('Fontes') }}</h2>
+        <button type="button" class="btn icon" @click="sourcesOpen = false" :aria-label="t('Fechar')">✕</button>
+      </header>
+      <p class="muted small">{{ t('O que cada fonte trouxe na última procura: relevantes são as que passaram os teus filtros.') }}</p>
+      <div class="health" v-if="health.length">
+        <b>⚠ {{ t('Fontes que parecem avariadas') }}</b>
+        <ul><li v-for="h in health" :key="h.source">{{ healthText(h) }}</li></ul>
+        <p class="muted small">{{ t('Se for normal (a fonte não tem vagas na tua zona), podes tirá-la das fontes no ⚙.') }}</p>
+      </div>
+      <ul class="source-list">
+        <li v-for="r in sourceGroups.top" :key="r.source" :class="[r.status, { broken: brokenSources.has(r.source) }]">
+          <span class="dot"></span>
+          <strong>{{ sourceName(r.source) }}</strong>
+          <span v-if="r.status === 'ok'">{{ t('{kept} relevantes de {fetched}', { kept: r.kept, fetched: r.fetched }) }}<b v-if="r.new">{{ t(' · {n} novas', { n: r.new }) }}</b></span>
+          <span v-else class="msg" :title="r.message">{{ r.status === 'skipped' ? r.message : t('Erro: {error}', { error: r.message }) }}</span>
+        </li>
+      </ul>
+      <details v-if="sourceGroups.none.length">
+        <summary>{{ t('{n} sem vagas relevantes', { n: sourceGroups.none.length }) }}</summary>
+        <ul class="source-list">
+          <li v-for="r in sourceGroups.none" :key="r.source" :class="r.status">
+            <span class="dot"></span>
+            <strong>{{ sourceName(r.source) }}</strong>
+            <span>{{ t('{kept} relevantes de {fetched}', { kept: r.kept, fetched: r.fetched }) }}</span>
+          </li>
+        </ul>
+      </details>
     </div>
   </div>
 

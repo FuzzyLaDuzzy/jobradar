@@ -497,19 +497,22 @@ def create_app(
         """Whether the AI is still scoring the jobs of the last search (the list reloads when it's done)."""
         return {"running": scoring_lock.locked()}
 
+    def config_sources() -> set[str] | None:
+        """The sources in the config now; None if it can't be read (an invalid config shows its own error)."""
+        try:
+            sources = config_mod.load(config_path).get("sources") or {}
+            return {source_label(kind, entry) for kind, entries in sources.items() for entry in entries or []}
+        except Exception:
+            return None
+
     @app.get("/api/runs")
     def runs():
-        return db.last_runs()
+        return db.last_runs(config_sources())
 
     @app.get("/api/health")
     def source_health():
-        """Sources that look broken (the warning above the list), among the ones in the config now."""
-        try:
-            sources = config_mod.load(config_path).get("sources") or {}
-            labels = {source_label(kind, entry) for kind, entries in sources.items() for entry in entries or []}
-        except Exception:  # an invalid config shows its own error: judge every source then
-            labels = None
-        return db.source_health(labels)
+        """Sources that look broken (the warning in the sources window), among the ones in the config now."""
+        return db.source_health(config_sources())
 
     @app.get("/api/config")
     def get_config():

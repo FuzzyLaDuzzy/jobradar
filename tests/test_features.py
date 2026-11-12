@@ -119,6 +119,9 @@ def test_sources_that_look_broken(tmp_path):
         {"source": "teamtailor:x", "kind": "error", "runs": 3, "message": "404 Not Found"},
         {"source": "workday:old", "kind": "empty", "runs": 3, "before": 120}]
     assert db.source_health({"lever:acme", "ey"}) == [health[0]]  # only the sources still in the config
+    # the sources line too: a source taken out of the config stops showing
+    assert [r["source"] for r in db.last_runs({"lever:acme", "ey"})] == ["ey", "lever:acme"]
+    assert len(db.last_runs()) == 5
 
 
 def test_health_endpoint(client):

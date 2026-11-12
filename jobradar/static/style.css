@@ -73,7 +73,19 @@ body {
 .brand h1 { margin: 0; font-size: 22px; letter-spacing: -.02em; }
 .brand p { margin: 0; color: var(--muted); font-size: 13.5px; }
 .top-actions { display: flex; align-items: center; gap: 10px; }
-.top-icons { display: flex; gap: 10px; }
+/* ☰ Menu */
+.menu-wrap { position: relative; }
+.menu {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 5; min-width: 220px;
+  display: flex; flex-direction: column; padding: 6px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 10px 28px rgba(0, 0, 0, .14);
+}
+.menu button, .menu a {
+  font: inherit; font-size: 14px; text-align: left; color: var(--text); text-decoration: none;
+  background: none; border: 0; border-radius: 8px; padding: 8px 10px; cursor: pointer;
+}
+.menu button:hover, .menu a:hover { background: var(--surface-2); }
+.menu hr { border: 0; border-top: 1px solid var(--border); margin: 4px 0; }
 
 /* buttons */
 .btn {
@@ -97,29 +109,27 @@ body {
 }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* source status */
-.sources { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0 6px; }
-.sources-summary {
-  display: none; align-items: center; gap: 6px; flex-wrap: wrap; width: 100%; text-align: left;
-  border: 1px solid var(--border); background: var(--surface); color: var(--muted); border-radius: 10px;
-  padding: 8px 12px; font: inherit; font-size: 13.5px; cursor: pointer;
+/* source status: one line, the list in its own window */
+.sources-line {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 18px 0 0; padding: 0;
+  border: 0; background: none; font: inherit; font-size: 13.5px; color: var(--muted); cursor: pointer; text-align: left;
 }
-.sources-summary b { color: var(--accent); }
-.sources-summary .failing { color: var(--warn); }
-.source-chip {
-  display: inline-flex; align-items: center; gap: 7px; max-width: 100%;
-  background: var(--surface); border: 1px solid var(--border); border-radius: 999px;
-  padding: 5px 12px; font-size: 12.5px; color: var(--muted);
+.sources-line:hover { color: var(--text); }
+.sources-line b { color: var(--accent); }
+.sources-line .failing { color: var(--warn); font-weight: 600; }
+.source-list { list-style: none; margin: 0; padding: 0; }
+.source-list li {
+  display: flex; align-items: center; gap: 8px; padding: 8px 2px; border-bottom: 1px solid var(--border);
+  font-size: 13.5px; color: var(--muted);
 }
-.source-chip strong { color: var(--text); font-weight: 600; }
-.source-chip b { color: var(--accent); }
-.source-chip .msg { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 340px; }
-.source-chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--high); flex: none; }
-.source-chip.skipped .dot { background: var(--mid); }
-.source-chip.error .dot { background: var(--danger); }
-.source-chip.error .msg { color: var(--danger); }
-.source-chip.broken { border-color: var(--warn); }
-.source-chip.broken .dot { background: var(--warn); }
+.source-list strong { color: var(--text); font-weight: 600; }
+.source-list b { color: var(--accent); }
+.source-list .msg { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.source-list .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--high); flex: none; }
+.source-list .skipped .dot { background: var(--mid); }
+.source-list .error .dot { background: var(--danger); }
+.source-list .error .msg { color: var(--danger); }
+.source-list .broken .dot { background: var(--warn); }
 .health {
   margin: 12px 0 0; padding: 10px 14px; border-radius: 12px; background: var(--warn-bg); color: var(--warn); font-size: 13.5px;
 }
@@ -141,7 +151,8 @@ body {
   font: inherit; font-size: 14px; color: var(--text); background: var(--surface);
   border: 1px solid var(--border); border-radius: 10px; padding: 8px 11px;
 }
-.toolbar input.search { flex: 1 1 260px; min-width: 0; }
+.toolbar input.search { flex: 1 1 200px; min-width: 0; }  /* 200px: "Filters" still fits beside it on a phone */
+.filters { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .toolbar input.search:focus, .toolbar select:focus { outline: 2px solid var(--accent-soft); border-color: var(--accent); }
 .range, .check { display: inline-flex; align-items: center; gap: 8px; font-size: 13.5px; color: var(--muted); }
 .range input { accent-color: var(--accent); width: 110px; }
@@ -246,6 +257,13 @@ details textarea {
 
 .actions { grid-column: 2; display: flex; flex-wrap: wrap; gap: 6px; }
 .actions .btn { padding: 6px 11px; }
+.actions select.status {
+  font: inherit; font-size: 13.5px; font-weight: 500; color: var(--text); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 10px; padding: 6px 8px; cursor: pointer;
+}
+/* where the job is, at a glance: applied and after in green, put aside in grey */
+.actions select.status:is(.guardada, .candidatei, .entrevista, .oferta) { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.actions select.status:is(.rejeitada, .descartada) { background: var(--surface-2); color: var(--muted); }
 
 .empty { text-align: center; padding: 56px 20px; color: var(--muted); }
 .empty h2 { color: var(--text); font-size: 18px; margin: 0 0 6px; }
@@ -420,19 +438,11 @@ details textarea.ai-text { min-height: 260px; }
   .card { grid-template-columns: 46px 1fr; gap: 12px; padding: 14px; }
   .score { width: 44px; height: 44px; font-size: 15px; }
   .actions { grid-column: 1 / -1; }
-  .actions .btn { flex: 1 1 auto; }
-  /* seven buttons don't fit a phone in one row: the search and the three small ones first, the rest
-     below; 160px keeps the next button off the first row */
-  .top-actions { width: 100%; flex-wrap: wrap; gap: 8px; }
-  .top-actions .btn:not(.icon) { flex: 1 1 auto; }
-  .top-actions .btn.primary { order: -2; flex: 1 1 160px; }
-  .top-icons { order: -1; gap: 8px; }
-  .top-actions > .muted { order: 1; flex: 1 1 100%; }
+  .actions .btn, .actions select.status { flex: 1 1 auto; }
+  /* the search across the screen, the menu beside it */
+  .top-actions { width: 100%; gap: 8px; }
+  .top-actions .btn.primary { flex: 1; }
   .tabs button { padding: 9px 9px 11px; }
   .tabs { scrollbar-width: none; }  /* they still scroll sideways */
-  /* 20+ sources would fill the whole first screen: one line, the chips when tapped */
-  .sources-summary { display: flex; }
-  .sources { margin-top: 16px; }
-  .source-chip .msg { max-width: 220px; }
   .sheet .triage-actions { grid-template-columns: 1fr 1fr; }
 }

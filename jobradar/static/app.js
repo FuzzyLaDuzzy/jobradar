@@ -61,7 +61,19 @@ const EN = {
   // header and source chips
   "Vagas na tua zona, filtradas e pontuadas para ti": "Jobs in your area, filtered and scored for you",
   "Atualizado {when}": "Updated {when}",
-  "+ Adicionar vaga": "+ Add job",
+  "Menu": "Menu",
+  "+ Adicionar vaga por link": "+ Add job by link",
+  "Tema claro": "Light theme",
+  "Tema escuro": "Dark theme",
+  "Fontes": "Sources",
+  "{n} relevantes": "{n} relevant",
+  "O que cada fonte trouxe na última procura: relevantes são as que passaram os teus filtros.":
+    "What each source brought in the last search: relevant means it passed your filters.",
+  "{n} sem vagas relevantes": "{n} with no relevant jobs",
+  "Filtros": "Filters",
+  "Estado": "Status",
+  "★ Guardada": "★ Saved",
+  "✕ Descartada": "✕ Discarded",
   "A procurar…": "Searching…",
   "Procurar vagas": "Find jobs",
   "Definições": "Settings",
@@ -72,7 +84,7 @@ const EN = {
   "A começar…": "Starting…",
   "ainda a ler {names}": "still reading {names}",
   "{n} fontes": "{n} sources",
-  "{n} com erro": "{n} with errors",
+  "{n} com problemas": "{n} failing",
   "A IA está a avaliar as vagas novas…": "The AI is scoring the new jobs…",
   // tabs and toolbar
   "Estado das vagas": "Job status",
@@ -244,8 +256,6 @@ const EN = {
   "Tema": "Theme",
   "Claro": "Light",
   "Escuro": "Dark",
-  "Mudar para tema claro": "Switch to light theme",
-  "Mudar para tema escuro": "Switch to dark theme",
   "Guardar chaves": "Save keys",
   "Chaves guardadas": "Keys saved",
   "Não foi possível guardar as chaves: {error}": "Couldn't save the keys: {error}",
@@ -422,7 +432,9 @@ createApp({
       systemDark: window.matchMedia("(prefers-color-scheme: dark)").matches,
       jobs: [],
       runs: [],
-      sourcesOpen: !window.matchMedia("(max-width: 720px)").matches, // on a phone, one line until tapped
+      sourcesOpen: false, // the sources' window
+      menuOpen: false, // ☰ Menu
+      filtersOpen: false, // everything but the search, behind "Filters"
       cut: [], // ✂ what the filters cut in the last search, and why
       health: [], // sources that look broken
       cutReason: "",
@@ -552,6 +564,32 @@ createApp({
     brokenSources() {
       return new Set(this.health.map((h) => h.source));
     },
+    // the "⚠ n failing" on the sources line: an error in the last search, or broken for a few searches
+    failingSources() {
+      return new Set([...this.brokenSources, ...this.runs.filter((r) => r.status === "error").map((r) => r.source)]);
+    },
+    // the sources' window: the ones with something to say first (problems, then most relevant jobs), the rest folded
+    sourceGroups() {
+      const quiet = (r) => r.status === "ok" && !r.kept && !this.brokenSources.has(r.source);
+      const rank = (r) => (this.failingSources.has(r.source) ? 0 : r.status === "ok" ? 2 : 1);
+      const top = this.runs.filter((r) => !quiet(r)).sort((a, b) => rank(a) - rank(b) || b.kept - a.kept);
+      return { top, none: this.runs.filter(quiet) };
+    },
+    // how many filters are on, for the "Filters · 2" button (the order isn't a filter)
+    activeFilters() {
+      return [this.source, this.minScore, this.minSalary, this.showInactive].filter(Boolean).length;
+    },
+    statuses() {
+      return [
+        { key: "nova", label: this.t("Nova") },
+        { key: "guardada", label: this.t("★ Guardada") },
+        { key: "candidatei", label: this.t("✓ Candidatei-me") },
+        { key: "entrevista", label: this.t("🎤 Entrevista") },
+        { key: "oferta", label: this.t("🏆 Oferta") },
+        { key: "rejeitada", label: this.t("⛔ Rejeitada") },
+        { key: "descartada", label: this.t("✕ Descartada") },
+      ];
+    },
     // the new jobs still to decide on, best first: what the ⚡ triage goes through
     triageJobs() {
       return this.visible.filter((j) => j.status === "nova" && j.active).sort((a, b) => b.score - a.score);
@@ -678,6 +716,7 @@ createApp({
         const fresh = runs.reduce((n, r) => n + (r.new || 0), 0);
         await this.load();
         this.showToast(fresh ? this.t("{n} vagas novas encontradas", { n: fresh }) : this.t("Sem vagas novas desde a última procura"));
+        if (fresh) this.tab = "nova";
         if (scoring) this.waitForScores();
       } catch (e) {
         this.error = e.message;
@@ -1179,6 +1218,13 @@ createApp({
       this._toastTimer = setTimeout(() => (this.toast = ""), 3500);
     },
 
+    // a company's own careers site needs no badge on its jobs: "Accenture" under Accenture says nothing new
+    sourceIsCompany(job) {
+      const source = this.normalize(this.sourceName(job.source));
+      const company = this.normalize(job.company);
+      return Boolean(company) && (company.includes(source) || source.includes(company));
+    },
+
     normalize(text) {
       return (text || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
     },
@@ -1234,6 +1280,9 @@ createApp({
   mounted() {
     this.loadLanguage();
     this.load();
+    // ☰ Menu: a click anywhere (one of its items too) or Esc closes it; its own button stops the click
+    document.addEventListener("click", () => (this.menuOpen = false));
+    document.addEventListener("keydown", (e) => e.key === "Escape" && (this.menuOpen = false));
     // links straight to a screen: /#mercado, /#perfil
     if (location.hash === "#mercado") this.openMarket();
     else if (location.hash === "#perfil") this.openProfile();

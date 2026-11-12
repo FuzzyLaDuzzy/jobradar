@@ -3,7 +3,7 @@
 # Edit config.yaml here or with the ⚙ button in the app.
 # Accents and capitals are optional everywhere ("estagio" = "Estágio").
 
-language: pt                  # pt = Português, en = English (also the PT/EN button in the app)
+language: pt                  # pt = Português, en = English (also ☰ Menu → 🌐 in the app)
 
 profile:
   # What the AI reads to score each job and to write your messages and interview notes.

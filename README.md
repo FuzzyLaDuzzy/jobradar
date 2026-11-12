@@ -85,8 +85,8 @@ LinkedIn, Indeed and Glassdoor are left out on purpose (see [Limitations](#limit
 - **Adds a job from its link**: paste it in **+ Add job** and **Read from link** fills in the title, company, place, date and description (not LinkedIn, Indeed or Glassdoor).
 - **Exports to CSV** (⬇): your applications, saved and discarded jobs and notes, in a sheet for Excel.
 - **Spots jobs that closed**: when a job disappears from its source, it's marked as no longer published.
-- **Português or English**: the PT/EN button changes the whole app, the error messages and what the AI writes for you.
-- **Light or dark**: the ☀/☾ button (until you choose, it follows your system).
+- **Português or English**: ☰ Menu → 🌐 changes the whole app, the error messages and what the AI writes for you.
+- **Light or dark**: ☰ Menu → ☾/☀ (until you choose, it follows your system).
 
 <p>
   <img src="docs/profile.png" alt="Your profile, filled in from a CV" width="49%">
@@ -149,11 +149,11 @@ The first run creates `config.yaml` from [`config.example.yaml`](config.example.
 
 ## Set it up for you
 
-The 👤 Profile screen covers what most people need: who you are, what you know, the kind of job (title words), the area and the level. It only rewrites the values you changed, so the comments and the rest of `config.yaml` stay as they were. Everything else, and the same settings in full, are in `config.yaml`, which you can also edit with the ⚙ button.
+The 👤 Profile screen covers what most people need: who you are, what you know, the kind of job (title words), the area and the level. It only rewrites the values you changed, so the comments and the rest of `config.yaml` stay as they were. Everything else, and the same settings in full, are in `config.yaml`, which you can also edit in ☰ Menu → ⚙ Settings.
 
 | Setting | What it does |
 |---|---|
-| `language` | `pt` or `en` (the same as the PT/EN button) |
+| `language` | `pt` or `en` (the same as ☰ Menu → 🌐) |
 | `search.locations_primary` | Your main place(s). Company sites are searched for these, and jobs there get more points. Add the English name when there is one: `[lisboa, lisbon]` |
 | `search.locations` | Every place you accept, e.g. `[lisboa, lisbon, oeiras, amadora, sintra]`. Include your district so ITJobs finds it |
 | `search.allow_remote` | `true` to also accept fully remote jobs in Portugal |
@@ -292,7 +292,7 @@ tests/              pytest
 - The sources are Portuguese, so JobRadar is made for jobs in Portugal.
 - JobRadar only reads what each site allows in its `robots.txt` and never gets around bot protection. Some sites (for example IEFP) can't be read for that reason.
 - The Workday endpoint is the one its careers pages use, but it has no official documentation and may change.
-- If a source fails (network, an API change), the others carry on and the error shows at the top of the app.
+- If a source fails (network, an API change), the others carry on: the sources line at the top shows ⚠, and the error is in the sources window.
 
 ## License
 

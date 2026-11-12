@@ -1,4 +1,4 @@
-"""Português or English, from `language` in config.yaml (the PT/EN button changes it).
+"""Português or English, from `language` in config.yaml (☰ Menu → 🌐 changes it).
 
 Texts are written in Portuguese where they are used and looked up here by that same
 text, so a missing translation shows the Portuguese one instead of breaking.

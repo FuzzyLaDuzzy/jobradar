@@ -378,12 +378,13 @@ class Database:
                                  "runs": window if before else len(history), "before": before})
         return problems
 
-    def last_runs(self) -> list[dict]:
+    def last_runs(self, sources: set[str] | None = None) -> list[dict]:
+        """The last search of each source. `sources`: the ones still in the config (a source taken out stops showing)."""
         rows = self.conn.execute(
             "SELECT * FROM runs WHERE id IN (SELECT MAX(id) FROM runs GROUP BY source) "
             "ORDER BY source"
         ).fetchall()
-        return [dict(r) for r in rows]
+        return [dict(r) for r in rows if sources is None or r["source"] in sources]
 
 
 def _row_to_dict(row: sqlite3.Row) -> dict:
