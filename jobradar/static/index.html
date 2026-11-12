@@ -378,7 +378,7 @@
             </div>
           </div>
           <div class="badges">
-            <span class="badge source">{{ sourceName(triageJob.source) }}</span>
+            <span class="badge source" v-if="!sourceIsCompany(triageJob)">{{ sourceName(triageJob.source) }}</span>
             <span class="badge" v-if="triageJob.contract">{{ triageJob.contract }}</span>
             <span class="badge" v-if="triageJob.experience && triageJob.experience.toLowerCase() !== (triageJob.contract || '').toLowerCase()">{{ triageJob.experience }}</span>
             <span class="badge" v-if="triageJob.work_model">{{ workModel(triageJob.work_model) }}</span>
