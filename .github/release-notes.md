@@ -1,8 +1,11 @@
 JobRadar finds junior jobs and internships in Portugal on many sites at once, and scores each one against your profile.
 
 **New in this version**
-- ⚡ **Quick triage**: go through the new jobs one at a time, best fit first. Arrow keys on a computer (→ save, ← discard, ↓ skip, C applied, Z undo), a swipe on a phone.
-- **IEFP**: the public employment service's professional internships (estágios profissionais) in your area's municipality.
+- **A cleaner screen**: Find jobs and one ☰ Menu at the top (Market, Profile, add a job by link, export, language, theme, settings).
+- **The sources in one line**, with ⚠ when one fails; the full list opens in its own window.
+- **The filters behind one button**, which shows how many are on.
+- **A status menu on each job** instead of seven buttons.
+- After a search with new jobs, the **New** tab opens, and sources you took out of your settings no longer show.
 
 **Android**: download `JobRadar-…-android.apk` below and open it.
 
