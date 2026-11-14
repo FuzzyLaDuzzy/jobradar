@@ -2,7 +2,9 @@
 
 [![tests](https://github.com/FuzzyLaDuzzy/jobradar/actions/workflows/tests.yml/badge.svg)](https://github.com/FuzzyLaDuzzy/jobradar/actions/workflows/tests.yml)
 
-A local app that finds jobs in your area of Portugal across job boards and company careers sites, keeps the ones that match the kind of job and level you want, scores each one against your profile, and helps you track your applications. It runs on your own computer, in Portuguese or English.
+A local app for anyone looking for a job in Portugal, whatever the job and whatever the level: an internship, a first junior job, a mid-level or senior role, or a lead or manager position. It finds jobs in your area across job boards and company careers sites, keeps the ones that match the job titles and levels you want, scores each one against your profile, and helps you track your applications. It runs on your own computer, in Portuguese or English.
+
+**Any job, any level.** In 👤 Profile, pick one or more levels (Internship, Junior, Mid-level, Senior, Lead, or all of them for any level) and the job titles you're after, such as "Backend Engineer", "Data Analyst" or "Product Manager". The filters, the score, the searches and the AI's messages all follow them. The field is yours too: the example settings are for IT, and for another field you change the title words in 👤 Profile and the excluded words in ⚙ Settings (a few sources, such as ITJobs, only list IT jobs).
 
 ![JobRadar](docs/screenshot.png)
 
@@ -145,11 +147,11 @@ cp .env.example .env
 python -m jobradar
 ```
 
-The first run creates `config.yaml` from [`config.example.yaml`](config.example.yaml). That file is yours: git ignores it, so updating JobRadar never touches your settings. The 👤 Profile screen opens by itself: drop your CV or fill it in, set your area and level, save, then press **Find jobs**. The first search takes about a minute, because JobRadar reads the full description of every job that passes the first filter.
+The first run creates `config.yaml` from [`config.example.yaml`](config.example.yaml). That file is yours: git ignores it, so updating JobRadar never touches your settings. The 👤 Profile screen opens by itself: drop your CV or fill it in, set your area, the job titles and the levels you want, save, then press **Find jobs**. Until you choose levels, JobRadar looks for internships and junior jobs, as it always has. The first search takes about a minute, because JobRadar reads the full description of every job that passes the first filter.
 
 ## Set it up for you
 
-The 👤 Profile screen covers what most people need: who you are, what you know, the kind of job (title words), the area and the level. It only rewrites the values you changed, so the comments and the rest of `config.yaml` stay as they were. Everything else, and the same settings in full, are in `config.yaml`, which you can also edit in ☰ Menu → ⚙ Settings.
+The 👤 Profile screen covers what most people need: who you are, what you know, the kind of job (title words and the job titles you're after), the area and the levels. It only rewrites the values you changed, so the comments and the rest of `config.yaml` stay as they were. Everything else, and the same settings in full, are in `config.yaml`, which you can also edit in ☰ Menu → ⚙ Settings.
 
 | Setting | What it does |
 |---|---|

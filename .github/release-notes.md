@@ -1,4 +1,4 @@
-JobRadar finds junior jobs and internships in Portugal on many sites at once, and scores each one against your profile.
+JobRadar finds jobs in Portugal on many sites at once, for any job title and any level (internship, junior, mid-level, senior or lead), and scores each one against your profile.
 
 **New in this version**
 - **A cleaner screen**: Find jobs and one ☰ Menu at the top (Market, Profile, add a job by link, export, language, theme, settings).
