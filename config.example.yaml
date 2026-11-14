@@ -47,10 +47,18 @@ search:
                    rpa, salesforce, servicenow, outsystems, dynamics, appian, low-code, workday, erp, crm,
                    business analyst]
 
-  # Level: words that mark a junior job or internship (they add points)...
+  # Level: choose it in 👤 Profile, or write it here: any of internship, junior, mid, senior, lead
+  # (several are fine; all of them = any level). A job whose title, contract or level names only
+  # other levels is skipped; one that names your level gets points. For example:
+  #   levels: [senior]
+  # Job titles you're after: they add points, count as your kind of job and are searched on ITJobs.
+  #   roles: [backend engineer]
+  # Without `levels`, these two lists set the level (internships and junior jobs, as always).
+  # Words that mark a junior job or internship (they add points)...
   junior_keywords: [junior, jr, trainee, graduate, entry level, estagio profissional,
                     estagiario, internship, intern, recem-licenciado, iefp, academy]
-  # ...and job titles with any of these words are skipped. Looking for senior jobs? Empty both lists.
+  # ...and job titles with any of these words are skipped. Once `levels` is set, it decides the
+  # level words; any other words you add to these lists still count.
   exclude_title_keywords: [senior, sr, lead, leader, principal, staff, manager, head,
                            director, architect, chief, vp, expert]
 
@@ -70,10 +78,10 @@ search:
 # more companies in your area; the README explains how to add each platform.
 sources:
   itjobs:                     # needs ITJOBS_API_KEY in .env (free at itjobs.pt/api)
-    - queries: [junior, trainee, estagio, graduate]
-      professional_internships: true   # every professional internship in your area
-      max_pages: 2
-      # every job in your district is read too; to choose districts by id: locations: [4]
+    - max_pages: 2
+      # searches the words of your level (junior, estagio...) and your roles, reads every professional
+      # internship in your area while Internship is one of your levels, and every job in your district.
+      # More words to search: queries: [...]; districts by id: locations: [4]
   landingjobs:                # official Landing.jobs feed (the ~60 most recent jobs)
     - feed: https://landing.jobs/feed
   netempregos:                # official Net-Empregos RSS: only the last ~24 h, so refresh daily

@@ -452,14 +452,18 @@
       <h3>{{ t('O que procuras') }}</h3>
       <div class="field"><span>{{ t('Posições (palavras que o título da vaga tem de ter)') }}</span>
         <chip-list v-model="profile.positions" :label="t('Posições (palavras que o título da vaga tem de ter)')" :placeholder="t('Escreve e carrega em Enter')" :remove-label="t('Remover')"></chip-list></div>
+      <div class="field"><span>{{ t('Funções que procuras (ex.: Backend Engineer)') }}</span>
+        <chip-list v-model="profile.roles" :label="t('Funções que procuras (ex.: Backend Engineer)')" :placeholder="t('Escreve e carrega em Enter')" :remove-label="t('Remover')"></chip-list>
+        <small class="muted hint">{{ t('Títulos de vaga: dão mais pontos e entram mesmo sem as palavras de posição.') }}</small></div>
+      <div class="choice" role="group" :aria-label="t('Nível')">
+        <span class="small">{{ t('Nível') }}</span>
+        <button v-for="l in levels" :key="l.id" type="button" class="btn" :class="{ on: profile.levels.includes(l.id) }"
+                :aria-pressed="profile.levels.includes(l.id) ? 'true' : 'false'" @click="toggleLevel(l.id)">{{ t(l.name) }}</button>
+      </div>
+      <p class="muted small">{{ t('Escolhe um ou mais. Nenhum ou todos = qualquer nível.') }}</p>
       <div class="field"><span>{{ t('Zona (a primeira é a principal)') }}</span>
         <chip-list v-model="profile.locations" :label="t('Zona (a primeira é a principal)')" :placeholder="t('Escreve e carrega em Enter')" :remove-label="t('Remover')"></chip-list></div>
       <label class="check"><input type="checkbox" v-model="profile.allow_remote"> {{ t('aceitar também vagas 100% remotas') }}</label>
-      <div class="choice" role="radiogroup" :aria-label="t('Nível')">
-        <span class="small">{{ t('Nível') }}</span>
-        <button type="button" class="btn" :class="{ on: profile.junior_only }" @click="profile.junior_only = true">{{ t('Só estágio e júnior') }}</button>
-        <button type="button" class="btn" :class="{ on: !profile.junior_only }" @click="profile.junior_only = false">{{ t('Qualquer nível') }}</button>
-      </div>
 
       <p class="alert" v-if="profileError">{{ profileError }}</p>
       <footer>

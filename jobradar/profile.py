@@ -7,14 +7,11 @@ from __future__ import annotations
 import json
 import re
 
-from . import message
+from . import levels, message
 from .i18n import t
 
 # the example config's placeholder name: while it is there, the profile still has to be filled in
 EXAMPLE_NAME = "Your Name"
-# "only internships and junior jobs" skips titles with these words (if the config has none yet)
-SENIOR_WORDS = ["senior", "sr", "lead", "leader", "principal", "staff", "manager", "head", "director",
-                "architect", "chief", "vp", "expert"]
 TEXTS = ("name", "signature", "summary", "facts")
 LISTS = ("skills", "focus", "education", "projects", "experience", "positions", "locations")
 # lists of short words, compared without capitals; the others are sentences
@@ -51,7 +48,9 @@ def from_config(cfg: dict) -> dict:
         "positions": list(search.get("title_keywords") or []),
         "locations": list(search.get("locations") or []),
         "allow_remote": bool(search.get("allow_remote")),
-        "junior_only": bool(search.get("exclude_title_keywords")),
+        "roles": list(search.get("roles") or []),
+        # all five = any level; a config from before levels shows the levels it works with
+        "levels": levels.chosen(search),
     }
 
 
@@ -64,8 +63,7 @@ def changes(form: dict, cfg: dict) -> dict[tuple[str, str], object]:
     search = cfg.get("search") or {}
     # the main places stay the same while they are still accepted; otherwise the first one
     primary = [p for p in search.get("locations_primary") or [] if p in form["locations"]] or form["locations"][:1]
-    senior = (search.get("exclude_title_keywords") or SENIOR_WORDS) if form["junior_only"] else []
-    return {
+    found = {
         ("profile", "name"): form["name"],
         ("profile", "signature"): form["signature"],
         ("profile", "cv_summary"): form["summary"],
@@ -75,8 +73,14 @@ def changes(form: dict, cfg: dict) -> dict[tuple[str, str], object]:
         ("search", "locations"): form["locations"],
         ("search", "locations_primary"): primary,
         ("search", "allow_remote"): form["allow_remote"],
-        ("search", "exclude_title_keywords"): senior,
     }
+    if "roles" in form:
+        found[("search", "roles")] = form["roles"]
+    # written only when the choice changes: until then a config from before levels keeps working
+    # exactly as it did, from its own lists (see levels.py)
+    if "levels" in form and set(form["levels"]) != set(levels.chosen(search)):
+        found[("search", "levels")] = form["levels"]
+    return found
 
 
 def clean(data: dict) -> dict:
@@ -88,9 +92,17 @@ def clean(data: dict) -> dict:
         if key in WORD_LISTS:
             items = [i.lower() for i in items]
         form[key] = list(dict.fromkeys(items))
-    for key in ("allow_remote", "junior_only"):  # from the screen; the AI doesn't set them
-        if key in data:
-            form[key] = bool(data[key])
+    if "allow_remote" in data:  # from the screen; the AI doesn't set it
+        form["allow_remote"] = bool(data["allow_remote"])
+    if isinstance(data.get("roles"), list):  # job titles: written as typed, repeats left out
+        roles: dict[str, str] = {}
+        for role in data["roles"]:
+            role = " ".join(str(role).split())
+            if role:
+                roles.setdefault(role.lower(), role)
+        form["roles"] = list(roles.values())
+    if isinstance(data.get("levels"), list):  # none is the same as all of them: any level
+        form["levels"] = levels.canonical(data["levels"])
     return form
 
 
@@ -106,5 +118,7 @@ def read_cv(pdf: bytes, cfg: dict, client=None) -> dict:
     if not isinstance(data, dict):
         raise message.MessageError(t("A IA não conseguiu ler o CV. Tenta outra vez ou preenche à mão."))
     form = clean(data)
+    for key in ("roles", "levels", "allow_remote"):  # your choices on the screen: a CV never changes them
+        form.pop(key, None)
     form["positions"] = [p for p in form["positions"] if p not in LEVEL_WORDS]
     return form

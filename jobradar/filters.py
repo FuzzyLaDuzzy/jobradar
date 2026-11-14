@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 from datetime import date, timedelta
 
+from . import levels
 from .i18n import t
 from .models import Job
 from .text import contains_term, matched_terms, normalize
@@ -76,14 +77,21 @@ def quick_reject(job: Job, search: dict) -> str | None:
         if normalize(name) and normalize(name) in company:
             return f"empresa excluída ({name})"
     title = normalize(job.title)
-    hits = matched_terms(title, search.get("exclude_title_keywords") or [])
+    roles = search.get("roles") or []
+    # the words of a role you're after ("Product Manager", "Tech Lead") don't count as a level
+    level_title = levels.without_roles(title, roles)
+    hits = matched_terms(level_title, levels.skipped_title_words(search))
     if hits:
         return f"título sénior ({hits[0]})"
+    # with levels chosen: the title, or the site's contract / level field, names only other levels
+    word = levels.other_level(normalize(" ".join([level_title, job.experience, job.contract])), search)
+    if word:
+        return f"outro nível ({word})"
     hits = matched_terms(title, search.get("exclude_keywords") or [])
     if hits:
         return f"excluída ({hits[0]})"
     kind_terms = search.get("title_keywords") or []
-    if kind_terms and not matched_terms(title, kind_terms):
+    if kind_terms and not matched_terms(title, kind_terms) and not levels.matched_roles(title, roles):
         return "fora da área"
     if location_status(job, search) is False:
         return "fora da zona"
@@ -137,7 +145,8 @@ def evaluate(job: Job, search: dict, today: date | None = None) -> tuple[bool, s
 
 def reason_label(reason: str) -> str:
     """A reason for cutting a job, in the app's language: "título sénior (lead)" -> "senior title (lead)"."""
-    names = {"título sénior": t("título sénior"), "excluída": t("excluída"), "fora da área": t("fora da área"),
+    names = {"título sénior": t("título sénior"), "outro nível": t("outro nível"), "excluída": t("excluída"),
+             "fora da área": t("fora da área"),
              "fora da zona": t("fora da zona"), "antiga": t("antiga"), "suspeita de burla": t("suspeita de burla"),
              "empresa excluída": t("empresa excluída")}
     name, _, rest = reason.partition(" (")

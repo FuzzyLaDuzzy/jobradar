@@ -8,7 +8,7 @@ from pathlib import Path
 
 import yaml
 
-from . import i18n
+from . import i18n, levels
 from .i18n import t
 from .scoring import PROVIDERS
 from .sources import FETCHERS, REQUIRED_FIELDS
@@ -25,6 +25,8 @@ SEARCH_LISTS = [
     "title_keywords",
     "exclude_companies",
     "scam_keywords",
+    "levels",
+    "roles",
 ]
 
 
@@ -56,6 +58,8 @@ def validate(cfg: dict) -> list[str]:
                 errors.append(t("{field} tem de ser uma lista.", field=f"search.{key}"))
         if not search.get("locations"):
             errors.append(t("search.locations não pode estar vazio."))
+        if isinstance(search.get("levels"), list) and levels.unknown(search["levels"]):
+            errors.append(t("search.levels só aceita {options}.", options=", ".join(levels.LEVELS)))
     profile = cfg.get("profile") if isinstance(cfg.get("profile"), dict) else {}
     for key in ("skills", "focus", "education", "projects", "experience"):
         if key in profile and not isinstance(profile[key], list):

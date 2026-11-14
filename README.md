@@ -67,8 +67,8 @@ LinkedIn, Indeed and Glassdoor are left out on purpose (see [Limitations](#limit
   - **IEFP**'s professional internships (estágios profissionais) in your area's municipality, from its public search; IEFP shows the employer only to the candidates
   - **Workable**'s and **SmartRecruiters**' public job searches, in your area: every company that hires through them, even the ones you've never heard of
   - **Company careers sites** on SmartRecruiters, Lever, Workday, SAP SuccessFactors, BambooHR, Recruitee, Zoho Recruit, Teamtailor and Greenhouse, from companies all over Portugal (Bosch, Farfetch, Accenture, Deloitte, Devoteam, Feedzai, Sword Health, Cloudflare, Celfocus… or any company you add); each keeps only the jobs in your area
-- **Filters** by your area, the kind of job (words the title must have), your level (junior words, senior words to skip), excluded words and companies, job age and typical scam signs. When a source doesn't say where the job is, it looks for the city in the description; when the title names a city outside your area ("Lisbon Based", "Relocate to…"), the title wins.
-- **Scores each job from 0 to 100** from keywords (level, area, your skills and interests), with a penalty for jobs that ask for 3+ years. With an AI key, an LLM also scores each new job against your profile and writes one sentence on why.
+- **Filters** by your area, the kind of job (words the title must have, or the job titles you're after), your level (internship, junior, mid-level, senior or lead: any mix of them, or any level), excluded words and companies, job age and typical scam signs. When a source doesn't say where the job is, it looks for the city in the description; when the title names a city outside your area ("Lisbon Based", "Relocate to…"), the title wins.
+- **Scores each job from 0 to 100** from keywords (your level, your job titles, area, your skills and interests), with a penalty for jobs that ask for more years than your level (3+ for internships and junior jobs). With an AI key, an LLM also scores each new job against your profile and writes one sentence on why.
 - **Your profile from your CV** (👤): drop your CV (PDF) and the AI fills in your name, contacts, skills, education, projects, experience and the jobs you're after; check and fix anything before saving, or fill it in by hand. Everything lands in `config.yaml`, which the score, the messages and the interview prep use.
 - **Writes a draft application message** (✉) in the posting's language, using only the facts in your profile, and honest about what you're missing.
 - **Prepares you for the interview** (🎯): what the job is looking for, likely technical and behavioural questions with hints from your profile, your gaps against the posting, and questions to ask the company.
@@ -158,7 +158,9 @@ The 👤 Profile screen covers what most people need: who you are, what you know
 | `search.locations` | Every place you accept, e.g. `[lisboa, lisbon, oeiras, amadora, sintra]`. Include your district so ITJobs finds it |
 | `search.allow_remote` | `true` to also accept fully remote jobs in Portugal |
 | `search.title_keywords` | The kind of job: the title must contain one of these words. The example is for IT; empty list = any job |
-| `search.junior_keywords` / `exclude_title_keywords` | Your level: words that mark a junior job (they add points), and title words to skip (senior, lead…) |
+| `search.levels` | Your level (👤 Profile → Level): any of `internship`, `junior`, `mid`, `senior`, `lead`, e.g. `[senior]` or `[mid, senior]`; all of them = any level. A job whose title, contract or level names only other levels is skipped, one that names yours gets points, and ITJobs searches for it |
+| `search.roles` | Job titles you're after, e.g. `[backend engineer]`: a title with every word of one gets points, counts as your kind of job, and ITJobs searches for it |
+| `search.junior_keywords` / `exclude_title_keywords` | Without `levels` (configs from before it), these set the level as they always did: words that mark a junior job (they add points), and title words to skip (senior, lead…). With `levels`, only the words in them that aren't level words still count |
 | `search.exclude_keywords` / `exclude_companies` | Jobs and companies to ignore |
 | `search.max_age_days` | Skip jobs older than this |
 | `profile` | Your summary, skills and interests (for the score), plus your name, signature, education, projects, experience and other facts the AI may use in messages (the 👤 screen fills these in) |
@@ -270,6 +272,7 @@ The tests fake every API's answers, so they run without internet or keys.
 jobradar/
   sources/          one connector per platform or job board
   filters.py        area, level, kind of job, exclusions, scams, years of experience asked
+  levels.py         the levels and job titles you're after: their words, and what each one keeps and scores
   scoring.py        keyword score + optional AI score (Gemini or Claude)
   message.py        application message and interview notes
   profile.py        the 👤 Profile screen: its fields, where they go in config.yaml, reading a CV with the AI

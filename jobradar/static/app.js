@@ -121,6 +121,8 @@ const EN = {
   "Fontes que parecem avariadas": "Sources that look broken",
   "Foi cortada pela palavra “{word}”.": "It was cut by the word “{word}”.",
   "Deixar de cortar “{word}”": "Stop cutting “{word}”",
+  "O título é de outro nível (“{word}”).": "The title is for another level (“{word}”).",
+  "Procurar também {level}": "Also look for {level}",
   "O título não tem nenhuma das tuas palavras de área. Acrescentar uma?": "The title has none of your field's words. Add one?",
   "Fica fora da tua zona.": "It's outside your area.",
   "Acrescentar “{place}” à zona": "Add “{place}” to your area",
@@ -339,8 +341,15 @@ const EN = {
   "Zona (a primeira é a principal)": "Area (the first one is the main one)",
   "aceitar também vagas 100% remotas": "also accept fully remote jobs",
   "Nível": "Level",
-  "Só estágio e júnior": "Internships and junior only",
-  "Qualquer nível": "Any level",
+  "Estágio": "Internship",
+  "Júnior": "Junior",
+  "Intermédio": "Mid-level",
+  "Sénior": "Senior",
+  "Liderança": "Lead",
+  "Escolhe um ou mais. Nenhum ou todos = qualquer nível.": "Pick one or more. None or all = any level.",
+  "Funções que procuras (ex.: Backend Engineer)": "Roles you're after (e.g. Backend Engineer)",
+  "Títulos de vaga: dão mais pontos e entram mesmo sem as palavras de posição.":
+    "Job titles: they add points and get in even without the position words.",
   "Guardar perfil": "Save profile",
   "Perfil guardado. As pontuações novas aparecem na próxima procura.": "Profile saved. The new scores show up on the next search.",
   "CV lido: revê os campos e carrega em Guardar perfil.": "CV read: check the fields and press Save profile.",
@@ -361,6 +370,8 @@ const EN = {
   "Ver as guardadas": "See saved jobs",
   // score reasons, stored in Portuguese by jobradar/scoring.py
   "júnior/estágio": "junior/internship",
+  "nível pretendido": "your level",
+  "função pretendida": "your role",
   "estágio profissional": "professional internship",
   "zona preferida": "preferred area",
 };
@@ -383,6 +394,11 @@ const PLATFORM_NAMES = {
 };
 const MAX_CV_BYTES = 5 * 1024 * 1024;
 const ITEM_LISTS = ["education", "projects", "experience"];
+// 👤 Profile → Level, in order (like LEVELS in jobradar/levels.py); names in Portuguese, translated by t()
+const LEVELS = [
+  { id: "internship", name: "Estágio" }, { id: "junior", name: "Júnior" }, { id: "mid", name: "Intermédio" },
+  { id: "senior", name: "Sénior" }, { id: "lead", name: "Liderança" },
+];
 
 function fileAsBase64(file) {
   return new Promise((resolve, reject) => {
@@ -481,6 +497,7 @@ createApp({
       profileExample: false,
       profileAi: "",
       profileError: "",
+      levels: LEVELS,
       savingProfile: false,
       readingCv: false,
       cvOver: false,
@@ -915,6 +932,15 @@ createApp({
           button: (w) => this.t("Deixar de cortar “{word}”", { word: w }),
         };
       }
+      // with levels chosen in 👤 Profile: add the job's level to them
+      const level = LEVELS.find((l) => l.id === c.level);
+      if (c.kind === "outro nível" && level) {
+        return {
+          text: this.t("O título é de outro nível (“{word}”).", { word }),
+          action: "add", field: "levels", words: [level.id],
+          button: () => this.t("Procurar também {level}", { level: this.t(level.name) }),
+        };
+      }
       if (c.kind === "fora da área") {
         const skip = new Set(["the", "and", "for", "with", "de", "da", "do", "das", "dos", "para", "com", "em", "e", "m/f"]);
         const words = [...new Set(c.title.toLowerCase().split(/[^\p{L}\p{N}.#+]+/u))]
@@ -1107,6 +1133,13 @@ createApp({
       } finally {
         this.readingCv = false;
       }
+    },
+
+    // several levels can be on at once; none or all of them is any level
+    toggleLevel(id) {
+      const on = new Set(this.profile.levels);
+      on.has(id) ? on.delete(id) : on.add(id);
+      this.profile.levels = LEVELS.map((l) => l.id).filter((l) => on.has(l));
     },
 
     addItem(list) {

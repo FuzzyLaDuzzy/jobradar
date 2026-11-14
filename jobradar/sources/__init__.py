@@ -2,6 +2,7 @@
 
 from . import (balancasmarques, bamboohr, eurotux, greenhouse, iefp, itjobs, landingjobs, lever, netempregos, randstad, recruitee, smartrecruiters,
                successfactors, sysmatch, teamtailor, workable, workday, workinbraga, zohorecruit)
+from .. import levels
 from .base import SourceSkipped, make_client
 
 FETCHERS = {
@@ -87,7 +88,10 @@ def with_area(kind: str, entry: dict, search: dict, sources: dict | None = None)
         "iefp": {"location": places},
         "smartrecruiters_search": {"keyword": places,
                                    "skip": [e.get("company", "") for e in (sources or {}).get("smartrecruiters") or []]},
-        "itjobs": {"location_names": search.get("locations") or []},
+        # ITJobs also searches the words of your levels and your roles, and reads every professional
+        # internship while Internship is one of your levels
+        "itjobs": {"location_names": search.get("locations") or [], "level_queries": levels.queries(search),
+                   "professional_internships": "internship" in levels.chosen(search)},
     }
     return {**defaults.get(kind, {}), **entry}
 

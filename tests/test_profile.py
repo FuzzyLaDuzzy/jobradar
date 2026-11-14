@@ -44,7 +44,8 @@ def test_profile_comes_from_the_config(config_path):
     assert data["example"] is True and data["ai"] == ""  # still the example profile; no AI key
     form = data["profile"]
     assert form["name"] == "Your Name" and "python" in form["skills"]
-    assert form["locations"][0] == "braga" and form["junior_only"] is True and form["allow_remote"] is False
+    assert form["locations"][0] == "braga" and form["allow_remote"] is False
+    assert form["levels"] == ["internship", "junior"] and form["roles"] == []  # the example skips senior titles
     assert "developer" in form["positions"]  # search.title_keywords
 
 
@@ -56,7 +57,7 @@ def test_saving_changes_only_those_values(config_path):
     assert config_path.read_text(encoding="utf-8") == before  # nothing changed, not a character
 
     form.update(name="Ana Costa", skills=["python", "c#", "yes"], projects=["App de reservas: React + Node"],
-                locations=["lisboa", "lisbon"], allow_remote=True, junior_only=False)
+                locations=["lisboa", "lisbon"], allow_remote=True, levels=[])
     data = tc.put("/api/profile", json=form).json()
     assert data["example"] is False and data["profile"]["skills"] == ["python", "c#", "yes"]
     text = config_path.read_text(encoding="utf-8")
@@ -65,11 +66,15 @@ def test_saving_changes_only_those_values(config_path):
     cfg = yaml.safe_load(text)
     assert cfg["profile"]["projects"] == ["App de reservas: React + Node"]  # new key, added
     assert cfg["search"]["locations_primary"] == ["lisboa"]  # braga is gone: the first place is the main one
-    assert cfg["search"]["exclude_title_keywords"] == [] and cfg["search"]["allow_remote"] is True
+    assert cfg["search"]["allow_remote"] is True
+    # no level picked is any level: all of them are written, and the old list is left as it was
+    assert cfg["search"]["levels"] == ["internship", "junior", "mid", "senior", "lead"]
+    assert "senior" in cfg["search"]["exclude_title_keywords"] and "roles" not in cfg["search"]
 
-    form["junior_only"] = True  # back to junior only: the senior words return
-    tc.put("/api/profile", json=form)
-    assert "senior" in yaml.safe_load(config_path.read_text(encoding="utf-8"))["search"]["exclude_title_keywords"]
+    form["levels"] = ["junior", "internship"]  # back to internships and junior jobs
+    data = tc.put("/api/profile", json=form).json()
+    assert yaml.safe_load(config_path.read_text(encoding="utf-8"))["search"]["levels"] == ["internship", "junior"]
+    assert data["profile"]["levels"] == ["internship", "junior"]
 
 
 def test_an_invalid_profile_is_not_saved(config_path):

@@ -19,6 +19,7 @@ EN = {
     "{field} tem de ser uma lista.": "{field} must be a list.",
     "{field} tem de ser um mapa.": "{field} must be a map.",
     "search.locations não pode estar vazio.": "search.locations can't be empty.",
+    "search.levels só aceita {options}.": "search.levels only takes {options}.",
     "Fonte desconhecida: {kind} (usa {known}).": "Unknown source: {kind} (use {known}).",
     "{entry} precisa de '{field}'.": "{entry} needs '{field}'.",
     "scoring.llm.provider tem de ser {options}.": "scoring.llm.provider must be {options}.",
@@ -98,6 +99,7 @@ EN = {
     "JobRadar a correr em {url}  (Ctrl+C para parar)": "JobRadar running at {url}  (Ctrl+C to stop)",
     # why the filters cut a job (the ✂ tab)
     "título sénior": "senior title",
+    "outro nível": "another level",
     "excluída": "excluded",
     "fora da área": "not your kind of job",
     "fora da zona": "outside your area",

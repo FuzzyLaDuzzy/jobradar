@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import base64
 
-from . import gemini, i18n
+from . import gemini, i18n, levels
 from .i18n import t
 from .scoring import PROVIDERS, llm_settings
 
@@ -83,12 +83,15 @@ def profile_text(profile: dict) -> str:
     return "\n".join(p.strip() for p in parts if p.strip())
 
 
-def _prompt(job: dict, profile: dict, ask: str) -> str:
+def _prompt(job: dict, profile: dict, ask: str, search: dict | None = None) -> str:
+    """search: the config's, for the levels and roles looked for (nothing until they are chosen)."""
     posting = (job.get("description") or "(sem descrição)").replace("</anuncio>", "")
+    wanted = levels.for_ai(search or {}, "pt")
+    wanted = "\n" + wanted if wanted else ""  # one more line in the profile, once chosen
     return f"""<perfil>
 Nome: {profile.get("name", "")}
 Assinatura: {profile.get("signature", "")}
-{profile_text(profile)}
+{profile_text(profile)}{wanted}
 </perfil>
 
 <vaga>
@@ -165,7 +168,7 @@ def _in_language(system: str, ask: str, language: str | None) -> tuple[str, str]
 
 def write(job: dict, cfg: dict, client=None, language: str | None = None) -> str:
     system, ask = _in_language(SYSTEM, "Escreve a mensagem de candidatura para esta vaga.", language)
-    prompt = _prompt(job, cfg.get("profile") or {}, ask)
+    prompt = _prompt(job, cfg.get("profile") or {}, ask, cfg.get("search"))
     return _generate(system, prompt, cfg, client)
 
 
@@ -187,11 +190,11 @@ def follow_up(job: dict, cfg: dict, client=None, language: str | None = None) ->
     sent = (job.get("applied_at") or "")[:10] or "(data não registada)"
     system, ask = _in_language(FOLLOW_UP_SYSTEM, f"Escreve o email de seguimento desta candidatura, enviada a {sent}.",
                                language)
-    return _generate(system, _prompt(job, cfg.get("profile") or {}, ask), cfg, client)
+    return _generate(system, _prompt(job, cfg.get("profile") or {}, ask, cfg.get("search")), cfg, client)
 
 
 def interview(job: dict, cfg: dict, client=None) -> str:
-    prompt = _prompt(job, cfg.get("profile") or {}, "Prepara-me para a entrevista desta vaga.")
+    prompt = _prompt(job, cfg.get("profile") or {}, "Prepara-me para a entrevista desta vaga.", cfg.get("search"))
     language, *sections = INTERVIEW_LANGUAGES[i18n.language]
     system = INTERVIEW_SYSTEM.format(language=language, **{f"s{i}": s for i, s in enumerate(sections, 1)})
     return _generate(system, prompt, cfg, client)
@@ -199,7 +202,7 @@ def interview(job: dict, cfg: dict, client=None) -> str:
 
 def tailor(job: dict, cfg: dict, client=None) -> str:
     """What to highlight in the CV for this job, and what it lacks: in the app's language, like the interview notes."""
-    prompt = _prompt(job, cfg.get("profile") or {}, "Diz-me como adaptar o meu CV a esta vaga.")
+    prompt = _prompt(job, cfg.get("profile") or {}, "Diz-me como adaptar o meu CV a esta vaga.", cfg.get("search"))
     language, *sections = CV_LANGUAGES[i18n.language]
     system = CV_SYSTEM.format(language=language, **{f"s{i}": s for i, s in enumerate(sections, 1)})
     return _generate(system, prompt, cfg, client)

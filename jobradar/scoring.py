@@ -12,7 +12,7 @@ import json
 import os
 import re
 
-from . import gemini, i18n
+from . import gemini, i18n, levels
 from .models import Job
 from .text import matched_terms, normalize
 
@@ -76,14 +76,25 @@ def keyword_score(job: Job, cfg: dict, flags: dict | None = None) -> tuple[int, 
     title_meta = normalize(" ".join([job.title, job.experience, job.contract]))
     reasons: list[str] = []
     score = 0
+    roles = search.get("roles") or []
+    chosen = levels.is_set(search)  # False: the config from before levels, scored as it always was
+    wanted = levels.chosen(search)
 
-    junior = matched_terms(title_meta, search.get("junior_keywords") or [])
-    if junior:
+    if chosen:
+        # the words of a role you're after ("Tech Lead") don't count as a level
+        if matched_terms(levels.without_roles(title_meta, roles), levels.wanted_words(search)):
+            score += 25
+            reasons.append("nível pretendido")
+    elif matched_terms(title_meta, search.get("junior_keywords") or []):
         score += 25
         reasons.append("júnior/estágio")
-    if "estagio profissional" in title_meta or "iefp" in text:
+    internships = not chosen or ("internship" in wanted and not levels.any_level(wanted))
+    if internships and ("estagio profissional" in title_meta or "iefp" in text):
         score += 10
         reasons.append("estágio profissional")
+    if levels.matched_roles(job.title, roles):
+        score += 20
+        reasons.append("função pretendida")
 
     loc = normalize(job.location)
     if matched_terms(loc, search.get("locations_primary") or []):
@@ -100,13 +111,17 @@ def keyword_score(job: Job, cfg: dict, flags: dict | None = None) -> tuple[int, 
     if stack:
         reasons.append(", ".join(stack))
 
-    # The UI already shows a "Pede N+ anos" badge, so this only adjusts the score.
+    # The UI already shows a "Pede N+ anos" badge, so this only adjusts the score. Up to the years
+    # your levels allow is fine, one more costs a little, more than that a lot (junior: 2 and 3+).
     years = flags.get("years_required")
-    if years and years >= 3:
-        score -= 20
-    elif years == 2:
-        score -= 5
-    if "senior" in normalize(job.experience):  # e.g. SmartRecruiters "Mid-Senior Level"
+    allowed = 1 if not chosen else levels.years_ok(search)
+    if years and allowed is not None:
+        if years >= allowed + 2:
+            score -= 20
+        elif years == allowed + 1:
+            score -= 5
+    # e.g. SmartRecruiters "Mid-Senior Level"; with levels chosen, the filter already read that field
+    if not chosen and "senior" in normalize(job.experience):
         score -= 10
 
     return max(0, min(100, score)), reasons
@@ -117,7 +132,7 @@ PROMPT = """You are helping a candidate decide which job postings to apply to.
 Candidate profile:
 {profile}
 
-{decisions}Job posting:
+{wanted}{decisions}Job posting:
 Title: {title}
 Company: {company}
 Location: {location}
@@ -166,8 +181,10 @@ def llm_available(cfg: dict) -> bool:
 def llm_score(job: Job, cfg: dict, client=None, examples: dict | None = None) -> tuple[int, str] | None:
     """examples: {"liked": [...], "disliked": [...]}, the candidate's past choices (Database.decision_examples)."""
     settings = llm_settings(cfg)
+    wanted = levels.for_ai(cfg.get("search") or {})  # "" until levels or roles are chosen: the prompt as it was
     prompt = PROMPT.format(
         profile=(cfg.get("profile") or {}).get("cv_summary", ""),
+        wanted=f"What the candidate is looking for:\n{wanted}\n\n" if wanted else "",
         decisions=decisions_text(examples),
         title=job.title,
         company=job.company,

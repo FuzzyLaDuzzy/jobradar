@@ -319,6 +319,7 @@ details textarea {
 .sheet.profile { width: min(640px, 100%); }
 .sheet.profile h3 { margin: 8px 0 0; font-size: 15px; }
 .form .field { display: grid; gap: 4px; font-size: 13px; font-weight: 600; }
+.form .field .hint { font-weight: 400; }
 .form label.check { display: flex; font-weight: 400; }
 .drop {
   position: relative; display: grid; gap: 4px; text-align: center; cursor: pointer;

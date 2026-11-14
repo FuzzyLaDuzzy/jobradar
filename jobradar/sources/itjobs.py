@@ -101,9 +101,11 @@ def fetch(
         raise SourceSkipped(t("Falta ITJOBS_API_KEY no .env (pede-a grátis em itjobs.pt/api)"))
 
     max_pages = int(entry.get("max_pages", 2))
-    requests: list[tuple[str, dict]] = [
-        ("job/search", {"q": q}) for q in entry.get("queries") or []
-    ]
+    # the entry's own words, then the ones of your levels and roles (sources.with_area), each once
+    queries: dict[str, str] = {}
+    for q in [*(entry.get("queries") or []), *(entry.get("level_queries") or [])]:
+        queries.setdefault(normalize(str(q)), q)
+    requests: list[tuple[str, dict]] = [("job/search", {"q": q}) for q in queries.values()]
     if entry.get("professional_internships", True):
         requests.append(("job/list", {"contract": PROFESSIONAL_INTERNSHIP}))
     # every job in these districts, not only the ones matching a query: the entry's own ids

@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field, field_validator
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from . import config as config_mod
-from . import discover, gemini, i18n, link, message, profile, salary, scoring, skills
+from . import discover, gemini, i18n, levels, link, message, profile, salary, scoring, skills
 from .i18n import t
 from .db import STATUSES, Database
 from .filters import reason_label
@@ -101,10 +101,11 @@ class LanguageBody(BaseModel):
 
 
 class FilterBody(BaseModel):
-    """✂ Cut: the change that would have kept a job ("stop cutting titles with lead", "add Lousado to the area")."""
+    """✂ Cut: the change that would have kept a job ("stop cutting titles with lead", "add Lousado to the area",
+    "look for Lead jobs too")."""
 
     action: Literal["remove", "add"]
-    field: Literal["exclude_title_keywords", "exclude_keywords", "title_keywords", "locations"]
+    field: Literal["exclude_title_keywords", "exclude_keywords", "title_keywords", "locations", "levels"]
     word: str = Field(min_length=1, max_length=60)
 
     @field_validator("word")
@@ -138,6 +139,7 @@ class KeysBody(BaseModel):
 
 
 MAX_CV_BYTES = 5 * 1024 * 1024
+Level = Literal["internship", "junior", "mid", "senior", "lead"]  # levels.LEVELS (a test keeps them the same)
 SHORT, LONG = 300, 5000
 
 
@@ -156,12 +158,13 @@ class ProfileBody(BaseModel):
     positions: list[str] = Field(default_factory=list, max_length=200)
     locations: list[str] = Field(default_factory=list, max_length=50)  # empty: config.validate says so
     allow_remote: bool = False
-    junior_only: bool = True
+    roles: list[str] | None = Field(None, max_length=50)  # None: left as they are
+    levels: list[Level] | None = None  # none or all of them: any level; None: left as they are
 
-    @field_validator("skills", "focus", "education", "projects", "experience", "positions", "locations")
+    @field_validator("skills", "focus", "education", "projects", "experience", "positions", "locations", "roles")
     @classmethod
-    def _short_items(cls, items: list[str]) -> list[str]:
-        if any(len(item) > SHORT for item in items):
+    def _short_items(cls, items: list[str] | None) -> list[str] | None:
+        if any(len(item) > SHORT for item in items or []):
             raise ValueError(t("cada item pode ter até {n} caracteres", n=SHORT))
         return items
 
@@ -281,18 +284,25 @@ def create_app(
         for job in cut:
             kind, _, word = job["reason"].partition(" (")
             job["kind"], job["word"] = kind, word.removesuffix(")")  # for the filter suggestion
+            if kind == "outro nível":  # the level that would have kept it ("lead" -> look for Lead jobs too)
+                job["level"] = levels.level_of(job["word"])
             job["category"] = reason_label(kind)
             job["reason"] = reason_label(job["reason"])
         return cut
 
     @app.post("/api/filters")
     def adjust_filter(body: FilterBody):
-        """One word less in an exclusion list, or one more in title_keywords / locations (from the ✂ tab)."""
+        """One word less in an exclusion list, or one more in title_keywords / locations / levels (from the ✂ tab)."""
         if (body.action == "remove") != (body.field in ("exclude_title_keywords", "exclude_keywords")):
             raise HTTPException(400, t("entrada inválida"))
+        if body.field == "levels" and body.word not in levels.LEVELS:
+            raise HTTPException(400, t("entrada inválida"))
         try:
-            values = list((config_mod.load(config_path).get("search") or {}).get(body.field) or [])
-            if body.action == "remove":
+            search = config_mod.load(config_path).get("search") or {}
+            values = list(search.get(body.field) or [])
+            if body.field == "levels":  # one more level, next to the ones looked for now
+                values = levels.canonical([*levels.chosen(search), body.word])
+            elif body.action == "remove":
                 values = [v for v in values if normalize(str(v)) != normalize(body.word)]
             elif not any(normalize(str(v)) == normalize(body.word) for v in values):
                 values.append(body.word)
