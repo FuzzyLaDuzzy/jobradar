@@ -81,8 +81,11 @@ def keyword_score(job: Job, cfg: dict, flags: dict | None = None) -> tuple[int, 
     wanted = levels.chosen(search)
 
     if chosen:
-        # the words of a role you're after ("Tech Lead") don't count as a level
-        if matched_terms(levels.without_roles(title_meta, roles), levels.wanted_words(search)):
+        # the title's level when it names one, else the site's field (as the filter reads it); the words
+        # of a role you're after ("Tech Lead") don't count as a level
+        level = levels.level_text(levels.without_roles(job.title, roles),
+                                  normalize(" ".join([job.experience, job.contract])))
+        if matched_terms(level, levels.wanted_words(search)):
             score += 25
             reasons.append("nível pretendido")
     elif matched_terms(title_meta, search.get("junior_keywords") or []):

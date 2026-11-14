@@ -83,8 +83,9 @@ def quick_reject(job: Job, search: dict) -> str | None:
     hits = matched_terms(level_title, levels.skipped_title_words(search))
     if hits:
         return f"título sénior ({hits[0]})"
-    # with levels chosen: the title, or the site's contract / level field, names only other levels
-    word = levels.other_level(normalize(" ".join([level_title, job.experience, job.contract])), search)
+    # with levels chosen: the title (or, when it names no level, the site's contract / level field)
+    # names only other levels
+    word = levels.other_level(level_title, normalize(" ".join([job.experience, job.contract])), search)
     if word:
         return f"outro nível ({word})"
     hits = matched_terms(title, search.get("exclude_keywords") or [])

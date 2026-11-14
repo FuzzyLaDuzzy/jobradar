@@ -126,6 +126,20 @@ def test_the_level_field_counts_when_the_title_says_nothing(senior):
     assert kept(job(title="Senior Backend Engineer", experience="Entry Level"), senior)[0]  # the title wins
 
 
+def test_a_title_naming_a_level_wins_over_the_site_field(cfg):
+    """Bosch files many jobs under SmartRecruiters' "Mid-Senior Level": the title says which one it is."""
+    mid = wants(cfg, ["junior", "mid"])
+    keep, reason, _ = kept(job(title="(Senior) Backend Developer", experience="Mid-Senior Level"), mid)
+    assert not keep and reason == "outro nível (senior)"
+    keep, _, flags = kept(job(title="Software Engineer", experience="Mid-Senior Level"), mid)
+    assert keep and "nível pretendido" in keyword_score(job(title="Software Engineer", experience="Mid-Senior Level"),
+                                                         mid, flags)[1]
+    # and for the score: a junior title doesn't get the level points from a "Mid-Senior" field for a senior
+    senior = wants(cfg, ["senior"])
+    assert "nível pretendido" not in keyword_score(job(title="Junior Developer", experience="Mid-Senior Level"),
+                                                   senior)[1]
+
+
 def test_senior_scoring_is_sensible(senior):
     def score(**kw):
         keep, _, flags = kept(job(**kw), senior)

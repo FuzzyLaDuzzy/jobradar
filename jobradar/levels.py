@@ -112,15 +112,22 @@ def skipped_title_words(search: dict) -> list[str]:
     return extra_words(words) if is_set(search) else words
 
 
-def other_level(text: str, search: dict) -> str | None:
-    """With levels chosen: the word of another level, when the text names levels and none of them is
-    one looked for ("Senior/Lead" stays for a senior; "Junior" goes). None when the text may stay."""
+def level_text(title: str, meta: str) -> str:
+    """The text that says a job's level, both already normalised: the title when it names one, else the
+    site's contract / level field. "(Senior) Backend Developer" is senior even where the site files it
+    under "Mid-Senior Level"."""
+    return title if detect(title) else meta
+
+
+def other_level(title: str, meta: str, search: dict) -> str | None:
+    """With levels chosen: the word of another level, when the job's level text (level_text) names levels
+    and none of them is one looked for ("Senior/Lead" stays for a senior; "Junior" goes). None: it may stay."""
     if not is_set(search):
         return None
     levels = chosen(search)
     if any_level(levels):
         return None
-    found = detect(text)
+    found = detect(level_text(title, meta))
     if not found or set(found) & set(levels):
         return None
     return next(iter(found.values()))
