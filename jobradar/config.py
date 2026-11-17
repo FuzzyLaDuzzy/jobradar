@@ -231,8 +231,9 @@ def _value_end(node: yaml.Node) -> int:
 
 
 def _entry_lines(entry: dict, dash: int) -> list[str]:
-    """One list item in block style: "- first: value" at column `dash`, the other keys under it."""
-    lines = [f"{' ' * (dash + 2)}{key}: {_scalar(str(value))}" for key, value in entry.items()]
+    """One list item in block style: "- first: value" at column `dash`, the other keys under it. Values are
+    written as the rest of config.yaml writes them (_render): a list in [...], true/false."""
+    lines = [f"{' ' * (dash + 2)}{_render(key, value, dash + 2)}" for key, value in entry.items()]
     return [" " * dash + "- " + lines[0].lstrip()] + lines[1:] if lines else []
 
 

@@ -73,3 +73,15 @@ def test_only_known_platforms_and_plain_entries(config_path):
     for bad in ({"company": "x\nscoring: {}"}, {"url": "https://evil.example"}, {}):
         assert client.post("/api/sources", json={"kind": "lever", "entry": bad}).status_code == 422
     assert config_path.read_text(encoding="utf-8") == before
+
+
+def test_a_list_value_is_written_as_a_list(tmp_path):
+    """A job board followed by its categories (Sapo Emprego, Net-Empregos): the list stays a list, as written by
+    hand elsewhere in config.yaml, instead of being refused when it reads back as text."""
+    path = tmp_path / "config.yaml"
+    path.write_text("search:\n  locations: [braga]\nsources:\n  landingjobs:\n    - feed: https://landing.jobs/feed\n",
+                    encoding="utf-8")
+    config.add_source("sapo", {"categories": ["informatica-tecnologias", "engenharia"]}, path)
+    text = path.read_text(encoding="utf-8")
+    assert "  sapo:\n    - categories: [informatica-tecnologias, engenharia]\n" in text
+    assert yaml.safe_load(text)["sources"]["sapo"] == [{"categories": ["informatica-tecnologias", "engenharia"]}]
