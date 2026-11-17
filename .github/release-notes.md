@@ -1,11 +1,10 @@
 JobRadar finds jobs in Portugal on many sites at once, for any job title and any level (internship, junior, mid-level, senior or lead), and scores each one against your profile.
 
 **New in this version**
-- **A cleaner screen**: Find jobs and one ☰ Menu at the top (Market, Profile, add a job by link, export, language, theme, settings).
-- **The sources in one line**, with ⚠ when one fails; the full list opens in its own window.
-- **The filters behind one button**, which shows how many are on.
-- **A status menu on each job** instead of seven buttons.
-- After a search with new jobs, the **New** tab opens, and sources you took out of your settings no longer show.
+- **Any job, any level**: in 👤 Profile, pick one or more levels (Internship, Junior, Mid-level, Senior, Lead) and the job titles you are after, such as "Backend Engineer" or "Data Analyst". The filters, the score, the ITJobs search and the AI's messages all follow them.
+- **A job's title decides its level** when it names one: "(Senior) Backend Developer" is no longer kept for someone looking for junior jobs, even when the site files it under "Mid-Senior Level".
+- **Also look for Senior** (or whichever level it is): save a job from the ✂ Cut tab that was cut for its level, and JobRadar offers to add that level to your search in one click.
+- Nothing changes until you choose levels: your current settings find and score the same jobs as before.
 
 **Android**: download `JobRadar-…-android.apk` below and open it.
 
