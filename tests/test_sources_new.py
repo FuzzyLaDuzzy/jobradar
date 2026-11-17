@@ -564,3 +564,16 @@ def test_breezy_list_and_detail_only_for_kept(make_client):
     assert (engineer.location, engineer.work_model, engineer.contract) == ("Coimbra, Porto", "hybrid", "Full-Time")
     assert (engineer.posted_at, engineer.description) == ("2026-10-22", "Safety-critical C++.\nEmbedded")
     assert (manager.location, manager.work_model, manager.description) == ("Portugal", "remote", "")
+
+
+def test_sapo_names_the_grupo_jpm_brand_in_the_title_as_the_company():
+    """Sapo lists the Balanças Marques group's jobs as "Grupo JPM", the brand at the start of the title: the
+    company's own page (the balancasmarques source) has the brand as the company and the title without it."""
+    def one(title, company="Grupo JPM"):
+        job = sapo.to_job(_sapo_offer("x", title, company=company))
+        return job.company, job.title
+    assert one("BM - Backend Developer") == ("Balanças Marques", "Backend Developer")
+    assert one("SDILAB | Full Stack Developer") == ("SDILAB", "Full Stack Developer")
+    assert one("Agentic Development Engineer (AI-Native Engineering)") == (
+        "Grupo JPM", "Agentic Development Engineer (AI-Native Engineering)")  # no brand named: the group
+    assert one("SAP - Basis Consultant", company="Dellent") == ("Dellent", "SAP - Basis Consultant")  # others untouched

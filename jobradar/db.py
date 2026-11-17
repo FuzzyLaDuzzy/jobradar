@@ -23,11 +23,23 @@ AGGREGATORS = {"itjobs", "landingjobs", "netempregos", "sapo", "randstad", "sysm
 _GENDER_RE = re.compile(r"\((?:[mfhxd]\s*/\s*)+[a-z]+\.?\)")  # (m/f), (f/m/x), (f/m/div.), (h/m)
 
 
+# Companies that publish each other's jobs under one name (company_key without spaces): Sapo Emprego lists the
+# Balanças Marques and SDILAB jobs under their group, Grupo JPM, which their own page names apart.
+def _employer(name: str) -> str:
+    return company_key(name).replace(" ", "")
+
+
+_SAME_EMPLOYER = {_employer(company): _employer(group) for group, companies in
+                  {"Grupo JPM": ["Balanças Marques", "SDILAB"]}.items() for company in companies}
+
+
 def duplicate_key(job: dict) -> str | None:
     """Same company and same title = the same job on two sites (often the company's page and ITJobs).
+    The company is compared without spaces ("iU Talent" is "IUTalent") and as its group (_SAME_EMPLOYER).
     The title is compared without "(m/f)", "Ref ...", punctuation, or the job's own place at the end;
     other brackets count, so "Developer (Java)" and "Developer (Python)" stay two jobs."""
-    company = company_key(job.get("company"))
+    company = _employer(job.get("company"))
+    company = _SAME_EMPLOYER.get(company, company)
     title = _GENDER_RE.sub(" ", re.sub(r"\bref\b.*$", " ", normalize(job.get("title"))))
     words = re.findall(r"[a-z0-9+#]+", title)
     place = set(re.findall(r"[a-z0-9]+", normalize(job.get("location"))))

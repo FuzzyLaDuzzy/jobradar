@@ -21,8 +21,24 @@ import time
 import httpx
 
 from ..models import Job
-from ..text import normalize, strip_html
+from ..text import company_key, normalize, strip_html
 from .base import Prefilter
+
+# Groups that publish their companies' jobs under the group's name, the brand at the start of the title
+# ("BM - Backend Developer"): the brand becomes the company, as on the company's own careers page.
+GROUP_BRANDS = {"Grupo JPM": {"BM": "Balanças Marques", "Balanças Marques": "Balanças Marques", "SDILAB": "SDILAB"}}
+_BRAND_RE = re.compile(r"^\s*([^|–-]{1,30}?)\s+[|–-]\s+(.+)$")
+
+
+def _brand(company: str, title: str) -> tuple[str, str]:
+    """(company, title) with a group's brand moved from the title to the company; anything else as it was."""
+    def key(name):
+        return company_key(name).replace(" ", "")
+    brands = next(({key(b): name for b, name in by_brand.items()} for group, by_brand in GROUP_BRANDS.items()
+                   if key(group) == key(company)), None)
+    match = _BRAND_RE.match(title) if brands else None
+    brand = brands.get(key(match.group(1))) if match else None
+    return (brand, match.group(2).strip()) if brand else (company, title)
 
 BASE = "https://emprego.sapo.pt"
 _HTML = {"Accept": "text/html"}
@@ -59,11 +75,12 @@ def _prop(page: str, name: str):
 
 def to_job(item: dict) -> Job:
     company = "" if item.get("anonymous") else item.get("company_name") or ""
+    company, title = _brand(company or "Empresa confidencial", strip_html(item.get("offer_name")))
     return Job(
         source="sapo",
         external_id=str(item["id"]),
-        company=company or "Empresa confidencial",
-        title=strip_html(item.get("offer_name")),
+        company=company,
+        title=title,
         location=item.get("location") or item.get("job_municipality") or item.get("job_district") or "",
         url=item.get("link") or f"{BASE}/offers/{item.get('canonical', '')}?id={item['id']}",
         posted_at=item.get("publication_date") or None,

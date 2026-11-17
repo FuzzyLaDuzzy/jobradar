@@ -67,3 +67,18 @@ def test_status_and_notes_reach_every_copy(tmp_path):
     # the card is now the one you acted on, and it is still a single card
     [card] = client.get("/api/jobs").json()
     assert card["status"] == "candidatei" and len(card["also_on"]) == 1
+
+
+def test_a_company_written_together_or_apart_is_one_company():
+    """Net-Empregos writes "iU Talent", Sapo "IUTalent"; the title's dash may be a hyphen or an en dash."""
+    key = lambda title, company: duplicate_key({"title": title, "company": company, "location": "Braga"})
+    assert key("AI Engineer – Agentic Development (M/F) - Braga", "IUTalent") == key(
+        "AI Engineer - Agentic Development (M/F) - Braga", "iU Talent")
+
+
+def test_a_group_and_its_companies_are_one_employer():
+    """Sapo lists the Balanças Marques and SDILAB jobs under their group, Grupo JPM."""
+    key = lambda company: duplicate_key({"title": "Agentic Development Engineer", "company": company,
+                                         "location": "Braga"})
+    assert key("Grupo JPM") == key("SDILAB") == key("Balanças Marques")
+    assert key("Grupo JPM") != key("Bosch")
