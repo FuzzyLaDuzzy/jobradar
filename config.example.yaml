@@ -86,6 +86,8 @@ sources:
     - feed: https://landing.jobs/feed
   netempregos:                # official Net-Empregos RSS: only the last ~24 h, so refresh daily
     - categories: [Informática]   # site categories to read (the feed has every area)
+  sapo:                       # emprego.sapo.pt, every field: the districts of your area (from `search`) and these
+    - categories: [informatica-tecnologias]   # categories (others: engenharia, gestao-economia, saude... see sources/sapo.py)
   randstad:                   # official Randstad RSS (includes Randstad Digital)
     - company: Randstad
       logo: https://www.google.com/s2/favicons?domain=randstad.pt&sz=128
@@ -150,6 +152,19 @@ sources:
     - company: jumia
       name: Jumia
       logo: https://www.google.com/s2/favicons?domain=jumia.com&sz=128
+    - company: blip
+      name: Blip
+      logo: https://www.google.com/s2/favicons?domain=blip.pt&sz=128
+    - company: kaizengaming
+      name: Kaizen Gaming
+      logo: https://www.google.com/s2/favicons?domain=kaizengaming.com&sz=128
+    - company: sensei
+      name: Sensei
+      logo: https://www.google.com/s2/favicons?domain=sensei.tech&sz=128
+  breezy:                     # https://<company>.breezy.hr
+    - company: critical-software
+      name: Critical Software
+      logo: https://www.google.com/s2/favicons?domain=criticalsoftware.com&sz=128
   # Large companies with offices in several cities. Each searches your primary places
   # unless the entry sets its own `search` (Workday) or `location` (SuccessFactors).
   smartrecruiters:            # https://jobs.smartrecruiters.com/<company>
@@ -171,6 +186,9 @@ sources:
     - company: tonicapp
       country: pt
       logo: https://www.google.com/s2/favicons?domain=tonicapp.com&sz=128
+    - company: cegid          # Primavera BSS, in Braga, is now Cegid
+      country: pt
+      logo: https://www.google.com/s2/favicons?domain=cegid.com&sz=128
   lever:                      # https://jobs.lever.co/<site>
     - site: farfetch
       company: FARFETCH

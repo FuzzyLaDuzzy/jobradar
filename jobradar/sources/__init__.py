@@ -1,6 +1,6 @@
 """Source connectors. Each `fetch(client, entry, prefilter)` returns a list of Jobs."""
 
-from . import (balancasmarques, bamboohr, eurotux, greenhouse, iefp, itjobs, landingjobs, lever, netempregos, randstad, recruitee, smartrecruiters,
+from . import (balancasmarques, bamboohr, breezy, eurotux, greenhouse, iefp, itjobs, landingjobs, lever, netempregos, randstad, recruitee, sapo, smartrecruiters,
                successfactors, sysmatch, teamtailor, workable, workday, workinbraga, zohorecruit)
 from .. import levels
 from .base import SourceSkipped, make_client
@@ -16,9 +16,11 @@ FETCHERS = {
     "zohorecruit": zohorecruit.fetch,
     "teamtailor": teamtailor.fetch,
     "greenhouse": greenhouse.fetch,
+    "breezy": breezy.fetch,
     "itjobs": itjobs.fetch,
     "landingjobs": landingjobs.fetch,
     "netempregos": netempregos.fetch,
+    "sapo": sapo.fetch,
     "randstad": randstad.fetch,
     "sysmatch": sysmatch.fetch,
     "eurotux": eurotux.fetch,
@@ -40,9 +42,11 @@ LABEL_FIELD = {
     "zohorecruit": "name",
     "teamtailor": "company",
     "greenhouse": "company",
+    "breezy": "company",
     "itjobs": None,
     "landingjobs": None,
     "netempregos": None,
+    "sapo": None,
     "randstad": None,
     "sysmatch": None,
     "eurotux": None,
@@ -63,9 +67,11 @@ REQUIRED_FIELDS = {
     "zohorecruit": ["name", "url"],
     "teamtailor": ["company"],
     "greenhouse": ["company"],
+    "breezy": ["company"],
     "itjobs": [],
     "landingjobs": [],
     "netempregos": [],
+    "sapo": [],
     "randstad": [],
     "sysmatch": [],
     "eurotux": [],
@@ -86,6 +92,8 @@ def with_area(kind: str, entry: dict, search: dict, sources: dict | None = None)
         "successfactors": {"location": places},
         "workable": {"location": places},
         "iefp": {"location": places},
+        # Sapo Emprego searches by district: the place names of the area that are districts
+        "sapo": {"location_names": search.get("locations") or []},
         "smartrecruiters_search": {"keyword": places,
                                    "skip": [e.get("company", "") for e in (sources or {}).get("smartrecruiters") or []]},
         # ITJobs also searches the words of your levels and your roles, and reads every professional

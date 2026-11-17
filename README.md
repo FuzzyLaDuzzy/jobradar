@@ -17,6 +17,7 @@ Out of the box ([`config.example.yaml`](config.example.yaml)) it reads these job
 | **ITJobs.pt** | Official API (free key) |
 | **Landing.jobs** | Official feed |
 | **Net-Empregos** | Official RSS feed |
+| **Sapo Emprego** (every field, in the districts of your area) | Its search pages |
 | **Randstad** (incl. Randstad Digital) | Official RSS feed |
 | **Sysmatch** | Its jobs page |
 | **Workable** (every company on Workable, searched in your area) | Public job search |
@@ -55,6 +56,11 @@ Out of the box ([`config.example.yaml`](config.example.yaml)) it reads these job
 | **Sword Health** | Greenhouse |
 | **Cloudflare** | Greenhouse |
 | **Jumia** | Greenhouse |
+| **Blip** | Greenhouse |
+| **Kaizen Gaming** | Greenhouse |
+| **Sensei** | Greenhouse |
+| **Critical Software** | Breezy HR |
+| **Cegid** (Primavera) | SmartRecruiters |
 
 When the same job shows up on two of them (a company's own page and ITJobs, say), it's one card with a link to each.
 
@@ -208,6 +214,7 @@ To add a company by hand, open one of its job pages and look at the domain of th
 | Zoho Recruit | careers pages ending in `/jobs/Careers` | `- name: Edigma`<br>`  url: https://careers.edigma.com/jobs/Careers` |
 | Teamtailor | `<company>.teamtailor.com`; a site on its own domain also works (`url:`) | `- company: nutrium`<br>`  name: Nutrium` |
 | Greenhouse | `job-boards.greenhouse.io/<company>` | `- company: swordhealth`<br>`  name: Sword Health` |
+| Breezy HR | `<company>.breezy.hr` | `- company: critical-software`<br>`  name: Critical Software` |
 
 ## Run it automatically
 

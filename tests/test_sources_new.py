@@ -1,6 +1,6 @@
 """Recruitee (Mercedes-Benz.io), Zoho Recruit (Edigma), Eurotux, Teamtailor (Nutrium), Balanças Marques (with SDILAB),
-Workable (search by place), Work in Braga, IEFP (internships) and Greenhouse (Sword Health),
-from real answers cut down to a few fields."""
+Workable (search by place), Work in Braga, IEFP (internships), Greenhouse (Sword Health), Sapo Emprego and
+Breezy (Critical Software), from real answers cut down to a few fields."""
 
 import html
 import json
@@ -8,8 +8,8 @@ import json
 import httpx
 import pytest
 
-from jobradar.sources import (balancasmarques, eurotux, greenhouse, iefp, recruitee, smartrecruiters, teamtailor, with_area,
-                              workable, workinbraga, zohorecruit)
+from jobradar.sources import (balancasmarques, breezy, eurotux, greenhouse, iefp, recruitee, sapo, smartrecruiters, teamtailor,
+                              with_area, workable, workinbraga, zohorecruit)
 
 # --- Recruitee ---------------------------------------------------------------
 
@@ -422,3 +422,145 @@ def test_iefp_reads_every_page_and_details_only_for_kept(make_client):
 def test_iefp_place_names():
     [job] = iefp.parse_list(_iefp_card("1", "Rececionista", "VIANA DO CASTELO", "Turismo", "Licenciatura"))
     assert job.location == "Viana do Castelo"
+
+
+# --- Sapo Emprego ------------------------------------------------------------
+
+def _sapo_offer(offer_id, title, company="IUTalent", place="Braga", **extra):
+    return {"id": offer_id, "publication_date": "2026-11-11", "job_district": "Braga", "job_municipality": "",
+            "location": place, "job_work_hours": "Full-Time", "offer_name": title,
+            "job_description": "Procuramos alguém para a <b>equipa</b>", "company_name": company, "anonymous": False,
+            "remote_work": False, "canonical": f"offer-{offer_id}",
+            "link": f"https://emprego.sapo.pt/offers/offer-{offer_id}?id={offer_id}", **extra}
+
+
+def _sapo_page(offers, total):
+    """The results page: the JSON in single-quoted Vue attributes, so a quote inside is an entity."""
+    def attr(value):
+        return html.escape(json.dumps(value, ensure_ascii=False), quote=True)
+    pagination = {"total": total, "page": 1, "size": 9, "offers_total": total}
+    return (f"<offers-results\n    :offers='{attr(offers)}'\n    :company='[]'\n"
+            f"    :pagination='{attr(pagination)}'\n></offers-results>")
+
+
+SAPO_PAGE_1 = _sapo_page(
+    [_sapo_offer("a1", "Backend Developer (M/F) - Braga"),
+     {"id": "ad-1", "is_highlighted": True},  # an ad among the offers: no offer_name
+     _sapo_offer("a2", "SAP Basis Consultant", company="Grupo D'Ouro", place="Lisboa, Coimbra ou Braga"),
+     _sapo_offer("a3", "Assistente Administrativo", anonymous=True, company_name="Segredo")]
+    + [_sapo_offer(f"f{n}", f"Técnico de Redes {n}", remote_work=True) for n in range(6)], total=10)
+SAPO_PAGE_2 = _sapo_page([_sapo_offer("a4", "Data Analyst - Power BI", place="Vila Nova de Famalicão")], total=10)
+SAPO_DETAIL = ('<script type="application/ld+json">\n{"@context": "https://schema.org", "@type": "JobPosting",'
+               ' "description": "<p>Python e FastAPI.</p><ul><li>2 anos</li></ul>",'
+               ' "hiringOrganization": {"@type": "Organization", "name": "IUTalent",'
+               ' "logo": "https://thumbs.web.sapo.io?epic=logo"}}\n</script>')
+
+
+def test_sapo_reads_every_page_and_details_only_for_kept(make_client):
+    seen = []
+
+    def handler(request):
+        seen.append(request.url)
+        if request.url.path == "/offers":
+            return httpx.Response(200, text=SAPO_PAGE_2 if request.url.params["pagina"] == "2" else SAPO_PAGE_1)
+        return httpx.Response(200, text=SAPO_DETAIL)
+
+    entry = with_area("sapo", {"categories": ["informatica-tecnologias"]},
+                      {"locations": ["braga", "guimaraes", "porto"]})
+    jobs = sapo.fetch(make_client(handler), entry, prefilter=lambda job: "Developer" in job.title, pause=0)
+    lists = [url for url in seen if url.path == "/offers"]
+    assert [dict(url.params) for url in lists] == [
+        {"local": "braga,porto", "categoria": "informatica-tecnologias", "pagina": "1"},  # districts only
+        {"local": "braga,porto", "categoria": "informatica-tecnologias", "pagina": "2"}]  # 10 jobs: 2 pages of 9
+    assert [str(url) for url in seen if url.path != "/offers"] == ["https://emprego.sapo.pt/offers/offer-a1?id=a1"]
+
+    by_id = {job.external_id: job for job in jobs}
+    assert len(jobs) == 10 and "ad-1" not in by_id
+    developer = by_id["a1"]
+    assert (developer.uid, developer.company, developer.location) == ("sapo:a1", "IUTalent", "Braga")
+    assert (developer.posted_at, developer.contract, developer.work_model) == ("2026-11-11", "Full-Time", "")
+    assert developer.description == "Python e FastAPI.\n2 anos"  # the whole description, from the job's page
+    assert developer.logo == "https://thumbs.web.sapo.io?epic=logo"
+    assert (by_id["a2"].company, by_id["a2"].location) == ("Grupo D'Ouro", "Lisboa, Coimbra ou Braga")
+    assert by_id["a2"].description == "Procuramos alguém para a equipa"  # not kept: the start, from the list
+    assert by_id["a3"].company == "Empresa confidencial"  # an anonymous offer doesn't name the company
+    assert by_id["f0"].work_model == "remote"
+    assert by_id["a4"].location == "Vila Nova de Famalicão"
+
+
+def test_sapo_districts_and_an_entry_of_its_own():
+    assert sapo.districts(["braga", "Guimarães", "Viana do Castelo", "Bragança", "lisboa"]) == [
+        "braga", "viana-do-castelo", "braganca", "lisboa"]  # a town is not a district: the search would ignore it
+    entry = with_area("sapo", {"districts": ["porto"]}, {"locations": ["braga"]})
+    assert entry["districts"] == ["porto"]  # the entry's own districts win over the area
+
+
+def test_sapo_without_districts_or_categories_reads_the_newest(make_client):
+    seen = []
+
+    def handler(request):
+        page = request.url.params["pagina"]
+        seen.append(dict(request.url.params))
+        return httpx.Response(200, text=_sapo_page([_sapo_offer(f"{page}-{n}", "Cozinheiro") for n in range(9)], 5000))
+
+    jobs = sapo.fetch(make_client(handler), {"location_names": ["maia"]}, prefilter=lambda job: False, max_pages=3,
+                      pause=0)
+    assert seen == [{"pagina": "1"}, {"pagina": "2"}, {"pagina": "3"}]  # the whole country, newest first, up to max_pages
+    assert len(jobs) == 27
+
+
+def test_sapo_waits_and_tries_again_when_asked_to_slow_down(make_client):
+    one_job = _sapo_page([_sapo_offer("a4", "Data Analyst - Power BI")], total=1)
+    answers = iter([httpx.Response(429, headers={"Retry-After": "0"}), httpx.Response(200, text=one_job),
+                    httpx.Response(429, headers={"Retry-After": "0"}), httpx.Response(429, headers={"Retry-After": "0"})])
+
+    def handler(request):
+        return next(answers)
+
+    [job] = sapo.fetch(make_client(handler), {"districts": ["braga"]}, pause=0)  # the list: on the second try
+    assert job.title == "Data Analyst - Power BI"
+    assert job.description == "Procuramos alguém para a equipa"  # its page said 429 twice: the start, from the list
+
+
+# --- Breezy ------------------------------------------------------------------
+
+def _breezy_place(city=None, model=None):
+    return {"country": {"name": "Portugal", "id": "PT"}, "city": city,
+            "remote_details": {"value": model} if model else None}
+
+
+BREEZY_JOBS = [
+    {"id": "3f8b6ae5c03201", "friendly_id": "3f8b6ae5c03201-software-engineer", "name": "Software Engineer ",
+     "url": "https://critical-software.breezy.hr/p/3f8b6ae5c03201-software-engineer",
+     "published_date": "2026-10-22T10:26:54.065Z", "type": {"id": "fullTime", "name": "Full-Time"},
+     "location": _breezy_place("Coimbra", "hybrid"),
+     "locations": [_breezy_place("Coimbra", "hybrid"), _breezy_place("Porto", "hybrid")],
+     "company": {"name": "Critical Software", "friendly_id": "critical-software"}},
+    {"id": "a21a05ea33a601", "friendly_id": "a21a05ea33a601-business-development-manager",
+     "name": "Business Development Manager", "url": "https://critical-software.breezy.hr/p/a21a05ea33a601-bdm",
+     "published_date": "2026-09-04T14:12:35.547Z", "type": {"id": "fullTime", "name": "Tempo integral"},
+     "location": _breezy_place(None, "remote"), "locations": [_breezy_place(None, "remote")],
+     "company": {"name": "Critical Software"}},
+]
+BREEZY_DETAIL = ('<script type="application/ld+json">{"@context": "https://schema.org/", "@type": "JobPosting",'
+                 ' "description": "<p>Safety-critical C++.</p><ul><li>Embedded</li></ul>"}</script>')
+
+
+def test_breezy_list_and_detail_only_for_kept(make_client):
+    seen = []
+
+    def handler(request):
+        seen.append(str(request.url))
+        if request.url.path == "/json":
+            return httpx.Response(200, json=BREEZY_JOBS)
+        return httpx.Response(200, text=BREEZY_DETAIL)
+
+    engineer, manager = breezy.fetch(make_client(handler), {"company": "critical-software", "name": "Critical Software"},
+                                     prefilter=lambda job: "Engineer" in job.title)
+    assert seen == ["https://critical-software.breezy.hr/json",
+                    "https://critical-software.breezy.hr/p/3f8b6ae5c03201-software-engineer"]  # no page for the manager
+    assert (engineer.uid, engineer.company, engineer.title) == (
+        "breezy:critical-software:3f8b6ae5c03201", "Critical Software", "Software Engineer")
+    assert (engineer.location, engineer.work_model, engineer.contract) == ("Coimbra, Porto", "hybrid", "Full-Time")
+    assert (engineer.posted_at, engineer.description) == ("2026-10-22", "Safety-critical C++.\nEmbedded")
+    assert (manager.location, manager.work_model, manager.description) == ("Portugal", "remote", "")

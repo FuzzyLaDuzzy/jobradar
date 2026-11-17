@@ -17,7 +17,7 @@ _TRACKED = ("guardada",) + APPLIED  # listed even when they no longer pass the f
 
 
 # job boards and agencies that repost companies' jobs: the company's own posting is the one kept
-AGGREGATORS = {"itjobs", "landingjobs", "netempregos", "randstad", "sysmatch", "workable", "workinbraga", "smartrecruiters_search"}
+AGGREGATORS = {"itjobs", "landingjobs", "netempregos", "sapo", "randstad", "sysmatch", "workable", "workinbraga", "smartrecruiters_search"}
 
 
 _GENDER_RE = re.compile(r"\((?:[mfhxd]\s*/\s*)+[a-z]+\.?\)")  # (m/f), (f/m/x), (f/m/div.), (h/m)
