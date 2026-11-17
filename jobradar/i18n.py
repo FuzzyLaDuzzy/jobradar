@@ -69,6 +69,10 @@ EN = {
     "O modelo recusou este pedido.": "The model declined this request.",
     "O modelo não devolveu nenhum texto.": "The model returned no text.",
     # sources
+    "{host} pede uma verificação de browser (proteção contra robôs), que o JobRadar não contorna. Se continuar, "
+    "fala com o site ou tira esta fonte das Definições.":
+        "{host} asks for a browser check (bot protection), which JobRadar does not get around. If it keeps "
+        "happening, contact the site or remove this source in Settings.",
     "Falta ITJOBS_API_KEY no .env (pede-a grátis em itjobs.pt/api)":
         "ITJOBS_API_KEY is missing from .env (get one free at itjobs.pt/api)",
     "ITJobs: {message}. Confirma a chave no .env (ITJOBS_API_KEY=..., sem espaços nem aspas) e que é a que "
