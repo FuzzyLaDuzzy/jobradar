@@ -115,7 +115,8 @@ Regras:
 - Quando falas de vagas, pões os uid delas em "jobs" (só uids que existem em <dados>), pela ordem em que
   interessam. A app mostra-as em cartões: não repitas no texto os pormenores dos cartões.
 - Podes propor no máximo uma ação por resposta. A app mostra-a num cartão e só a faz quando a pessoa carrega
-  em Confirmar: nunca digas que já a fizeste. As ações:
+  em Confirmar. Por isso o texto propõe e nunca diz que já está feito: "Queres que junte Guimarães à zona?
+  Carrega em Confirmar.", nunca "Adicionei Guimarães". As ações:
   - {{"type": "status", "uid": "...", "status": "..."}}: mudar o estado de uma vaga. Estados: {statuses}.
   - {{"type": "search", "positions": [...], "locations": [...], "roles": [...], "levels": [...],
     "allow_remote": true|false}}: mudar a procura; manda só os campos a mudar, cada lista inteira como deve

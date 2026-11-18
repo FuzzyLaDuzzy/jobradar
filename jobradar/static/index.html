@@ -578,13 +578,28 @@
       <div v-for="(m, i) in bliss.messages" :key="i" class="bliss-msg" :class="['from-' + m.role, { error: m.error }]">
         <img v-if="m.role === 'bliss'" src="/static/bliss.svg" alt="" class="bliss-face">
         <div class="bliss-bubble">
-          <p>{{ m.greeting ? t('Olá! Sou o Bliss, o assistente do JobRadar, criado por Flávio Silva. Pergunta-me o que quiseres sobre a tua procura de emprego ou sobre a app.') : m.text }}</p>
+          <p>{{ blissText(m) }}</p>
           <div class="bliss-jobs" v-if="m.jobs && m.jobs.length">
             <button v-for="j in blissJobs(m)" :key="j.uid" class="bliss-job" @click="showJob(j)">
               <b>{{ j.title }}</b>
               <span class="muted small">{{ j.company }} · {{ j.location || t('Localização por confirmar') }} · {{ j.score }}</span>
             </button>
           </div>
+          <!-- an action Bliss proposes: nothing happens until Confirm -->
+          <div class="bliss-action" v-if="m.action && m.actionState && m.actionState !== 'dismissed'">
+            <p>{{ actionSummary(m) }}</p>
+            <div class="bliss-action-buttons" v-if="m.actionState === 'pending'">
+              <button class="btn primary" @click="confirmAction(m)" :disabled="m.actionBusy || refreshing">
+                <span v-if="m.actionBusy" class="spinner"></span>{{ t('Confirmar') }}
+              </button>
+              <button class="btn" @click="dismissAction(m)" :disabled="m.actionBusy">{{ t('Agora não') }}</button>
+            </div>
+            <p v-else class="muted small">{{ t('✓ Feito') }}</p>
+          </div>
+          <button v-if="m.role === 'bliss' && !m.error && blissVoice" class="bliss-say" @click="speak(m)"
+                  :title="speaking === m ? t('Parar') : t('Ouvir')" :aria-label="speaking === m ? t('Parar') : t('Ouvir')">
+            {{ speaking === m ? '⏹' : '🔊' }}
+          </button>
           <div class="bliss-suggestions" v-if="m.greeting && i === bliss.messages.length - 1">
             <button v-for="s in blissSuggestions" :key="s" class="btn" @click="sendBliss(s)" :disabled="bliss.busy">{{ s }}</button>
           </div>

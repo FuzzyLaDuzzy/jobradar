@@ -481,6 +481,12 @@ details textarea.ai-text { min-height: 260px; }
 }
 .bliss-job:hover { border-color: var(--accent); }
 .bliss-suggestions .btn { text-align: left; white-space: normal; }
+.bliss-action { margin-top: 8px; padding: 10px; border: 1px solid var(--accent); border-radius: 10px; background: var(--surface); }
+.bliss-action p { margin: 0 0 8px; white-space: pre-wrap; }
+.bliss-action p.muted { margin: 0; }
+.bliss-action-buttons { display: flex; gap: 6px; flex-wrap: wrap; }
+.bliss-say { margin-top: 6px; padding: 2px 6px; border: 0; border-radius: 6px; background: none; cursor: pointer; font-size: 15px; opacity: .7; }
+.bliss-say:hover { opacity: 1; background: var(--surface); }
 .bliss-input { display: flex; gap: 8px; align-items: flex-end; padding: 10px 12px; border-top: 1px solid var(--border); }
 .bliss-input textarea {
   flex: 1; resize: none; font: inherit; padding: 9px 11px; color: var(--text); background: var(--surface);

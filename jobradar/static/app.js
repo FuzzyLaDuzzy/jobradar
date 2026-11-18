@@ -399,6 +399,25 @@ const EN = {
   "Porque tenho poucas vagas novas?": "Why do I have few new jobs?",
   "A vaga está escondida pelos filtros: limpa os filtros para a ver.":
     "The job is hidden by the filters: clear them to see it.",
+  "Confirmar": "Confirm",
+  "✓ Feito": "✓ Done",
+  "Mudar «{title}» para {status}": "Change «{title}» to {status}",
+  "Procurar vagas agora": "Search for jobs now",
+  "Escrever a mensagem de candidatura para «{title}»": "Write the application message for «{title}»",
+  "Mudar a procura:": "Change the search:",
+  "Palavras de área": "Field words",
+  "Zona": "Area",
+  "Cargos": "Roles",
+  "Níveis": "Levels",
+  "sem mudanças": "no changes",
+  "Remoto: {value}": "Remote: {value}",
+  "sim": "yes",
+  "não": "no",
+  "Procura atualizada.": "Search updated.",
+  "Encontrei {n} vagas novas.": "I found {n} new jobs.",
+  "Toca outra vez no 🔊 para ouvir.": "Tap 🔊 again to listen.",
+  "Ouvir": "Listen",
+  "Parar": "Stop",
 };
 
 function loadFilters() {
@@ -545,6 +564,9 @@ createApp({
       triage: { open: false, queue: [], index: 0, history: [], dir: "", dx: 0, startX: null },
       // Bliss, the assistant: job is the one the conversation is about ({uid, title}); area is for the first suggestion
       bliss: { open: false, messages: loadBliss(), busy: false, job: null, about: false, area: "", draft: "" },
+      blissVoice: false, // 🔊 needs GEMINI_API_KEY (Gemini's voice, whatever AI writes the answers)
+      speaking: null, // the message being read aloud
+      blissAudio: null,
     };
   },
 
@@ -1312,14 +1334,18 @@ createApp({
       if (!this.bliss.area) {
         this.api("/api/profile").then((p) => (this.bliss.area = (p.profile.locations || [])[0] || "")).catch(() => {});
       }
+      this.api("/api/keys").then((k) => (this.blissVoice = !!k.GEMINI_API_KEY)).catch(() => {});
       this.scrollBliss();
     },
 
     closeBliss() {
       this.bliss.open = false;
+      this.stopSpeaking();
     },
 
     newBlissChat() {
+      this.stopSpeaking();
+      for (const m of this.bliss.messages) if (m.audio) URL.revokeObjectURL(m.audio);
       this.bliss.messages = [BLISS_GREETING()];
       this.bliss.job = null;
       this.saveBliss();
@@ -1327,7 +1353,8 @@ createApp({
 
     saveBliss() {
       try {
-        localStorage.setItem(BLISS_KEY, JSON.stringify(this.bliss.messages.slice(-BLISS_KEEP)));
+        const kept = this.bliss.messages.slice(-BLISS_KEEP).map(({ audio, actionBusy, ...m }) => m);
+        localStorage.setItem(BLISS_KEY, JSON.stringify(kept));
       } catch {
         /* storage unavailable: the conversation just won't be there next time */
       }
@@ -1357,8 +1384,10 @@ createApp({
           body: JSON.stringify({ messages: history, job: this.bliss.job && this.bliss.job.uid }),
         });
         for (const j of out.jobs) if (!this.jobs.some((x) => x.uid === j.uid)) this.jobs.push(j);
-        this.bliss.messages.push({ role: "bliss", text: out.text, jobs: out.jobs.map((j) => j.uid), action: out.action,
-          actionState: out.action ? "pending" : null });
+        const said = { role: "bliss", text: out.text, jobs: out.jobs.map((j) => j.uid), action: out.action,
+          actionState: out.action ? "pending" : null };
+        if (out.action && out.action.type === "search") said.before = (await this.api("/api/profile")).profile;
+        this.bliss.messages.push(said);
       } catch (e) {
         // the question goes back to the box, to send again
         this.bliss.messages.splice(this.bliss.messages.indexOf(asked), 1);
@@ -1368,6 +1397,112 @@ createApp({
         this.bliss.busy = false;
         this.saveBliss();
         this.scrollBliss();
+      }
+    },
+
+    blissText(m) {
+      return m.greeting ? this.t("Olá! Sou o Bliss, o assistente do JobRadar, criado por Flávio Silva. Pergunta-me o que quiseres sobre a tua procura de emprego ou sobre a app.") : m.text;
+    },
+
+    // the card of an action Bliss proposes: what Confirm will do, in words
+    actionSummary(m) {
+      const a = m.action;
+      const job = a.uid && this.jobs.find((j) => j.uid === a.uid);
+      const title = job ? job.title : a.uid;
+      if (a.type === "status") {
+        const status = (this.statuses.find((st) => st.key === a.status) || { label: a.status }).label;
+        return this.t("Mudar «{title}» para {status}", { title, status });
+      }
+      if (a.type === "refresh") return this.t("Procurar vagas agora");
+      if (a.type === "message") return this.t("Escrever a mensagem de candidatura para «{title}»", { title });
+      const names = { positions: this.t("Palavras de área"), locations: this.t("Zona"), roles: this.t("Cargos"), levels: this.t("Níveis") };
+      const label = (key, v) => (key === "levels" ? this.t((LEVELS.find((l) => l.id === v) || { name: v }).name) : v);
+      const lines = [this.t("Mudar a procura:")];
+      for (const key of Object.keys(names)) {
+        if (!a[key]) continue;
+        const before = (m.before && m.before[key]) || [];
+        const changes = [...a[key].filter((v) => !before.includes(v)).map((v) => "+ " + label(key, v)),
+          ...before.filter((v) => !a[key].includes(v)).map((v) => "− " + label(key, v))];
+        lines.push(`${names[key]}: ${changes.join(", ") || this.t("sem mudanças")}`);
+      }
+      if ("allow_remote" in a) lines.push(this.t("Remoto: {value}", { value: a.allow_remote ? this.t("sim") : this.t("não") }));
+      return lines.join("\n");
+    },
+
+    async confirmAction(m) {
+      const a = m.action;
+      m.actionBusy = true;
+      let done = true;
+      try {
+        if (a.type === "status") {
+          const job = this.jobs.find((j) => j.uid === a.uid);
+          if (job && job.status !== a.status) await this.setStatus(job, a.status); // it says so itself if it fails
+          done = !job || job.status === a.status;
+        } else if (a.type === "search") {
+          const { profile } = await this.api("/api/profile");
+          for (const key of ["positions", "locations", "roles", "levels", "allow_remote"]) if (key in a) profile[key] = a[key];
+          await this.api("/api/profile", { method: "PUT", body: JSON.stringify(profile) });
+          this.bliss.messages.push({ role: "bliss", text: this.t("Procura atualizada."), local: true,
+            action: { type: "refresh" }, actionState: "pending" });
+        } else if (a.type === "refresh") {
+          const before = new Set(this.jobs.map((j) => j.uid));
+          await this.refresh();
+          if (this.error) throw new Error(this.error);
+          const fresh = this.jobs.filter((j) => !before.has(j.uid));
+          this.bliss.messages.push({ role: "bliss", local: true, jobs: fresh.map((j) => j.uid),
+            text: fresh.length ? this.t("Encontrei {n} vagas novas.", { n: fresh.length }) : this.t("Sem vagas novas desde a última procura") });
+        } else if (a.type === "message") {
+          const job = this.jobs.find((j) => j.uid === a.uid);
+          if (job) {
+            this.showJob(job);
+            this.generate(job, "message");
+          }
+        }
+      } catch (e) {
+        done = false;
+        this.showToast(e.message);
+      } finally {
+        m.actionBusy = false;
+        if (done) m.actionState = "done";
+        this.saveBliss();
+        this.scrollBliss();
+      }
+    },
+
+    dismissAction(m) {
+      m.actionState = "dismissed";
+      this.saveBliss();
+    },
+
+    stopSpeaking() {
+      if (this.blissAudio) this.blissAudio.pause();
+      this.speaking = null;
+    },
+
+    // 🔊 the answer read aloud by Gemini; kept in memory, so listening again costs nothing
+    async speak(m) {
+      if (this.speaking === m) return this.stopSpeaking();
+      this.stopSpeaking();
+      const audio = new Audio(); // made in the tap itself: a phone's webview only plays sound a tap started
+      this.blissAudio = audio;
+      this.speaking = m;
+      audio.onended = () => this.speaking === m && (this.speaking = null);
+      try {
+        if (!m.audio) {
+          const res = await fetch("/api/bliss/voice", { method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: this.blissText(m).slice(0, 1500) }) });
+          if (!res.ok) {
+            const body = await res.json().catch(() => ({}));
+            throw new Error(body.detail || this.t("Erro {code}", { code: res.status }));
+          }
+          m.audio = URL.createObjectURL(await res.blob());
+        }
+        if (this.blissAudio !== audio) return; // another one was asked for meanwhile
+        audio.src = m.audio;
+        await audio.play();
+      } catch (e) {
+        if (this.speaking === m) this.speaking = null;
+        this.showToast(e.name === "NotAllowedError" ? this.t("Toca outra vez no 🔊 para ouvir.") : e.message);
       }
     },
 
