@@ -322,3 +322,23 @@ def test_reply_asks_for_the_language_again_at_the_end(tmp_path, cfg, make_client
     bliss.reply([{"role": "user", "text": question}], Database(tmp_path / "t.db"), cfg, client)
     assert seen[0]["contents"][0]["parts"][0]["text"].endswith(bliss.ANSWER_IN[answer_in])
     assert bliss.ANSWER_IN["en"] == 'Write the "text" of your answer in English.'
+
+
+def test_parse_write_actions():
+    def action(a):
+        return bliss.parse(json.dumps({"text": "Vou escrever.", "jobs": [], "action": a}), KNOWN)["action"]
+    assert action({"type": "write", "kind": "letter", "uid": "lever:acme:1"}) == \
+        {"type": "write", "kind": "letter", "uid": "lever:acme:1"}
+    assert action({"type": "write", "kind": "letter", "uid": "lever:acme:1", "language": "en"}) == \
+        {"type": "write", "kind": "letter", "uid": "lever:acme:1", "language": "en"}
+    assert action({"type": "write", "kind": "letter", "uid": "lever:acme:1", "language": "fr"}) == \
+        {"type": "write", "kind": "letter", "uid": "lever:acme:1"}  # only that field drops
+    assert action({"type": "write", "kind": "poema", "uid": "lever:acme:1"}) is None
+    assert action({"type": "write", "kind": "letter", "uid": "nao:existe"}) is None
+    assert action({"type": "message", "uid": "lever:acme:1"}) is None  # the old type is gone
+
+
+def test_system_lists_the_write_kinds_and_no_second_greeting():
+    assert "|".join(bliss.WRITE_KINDS) in bliss.SYSTEM  # "message|letter|followup|interview|cv"
+    assert "não te apresentes" in bliss.SYSTEM
+    assert '"type": "message"' not in bliss.SYSTEM

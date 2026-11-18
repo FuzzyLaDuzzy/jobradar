@@ -101,7 +101,9 @@ def snapshot(db: Database, cfg: dict, question: str, job_uid: str | None = None,
     return f"<dados>\n{_inert(chr(10).join(lines))}\n</dados>"
 
 
-ACTIONS = ("status", "search", "refresh", "message")
+ACTIONS = ("status", "search", "refresh", "write")
+# the texts Bliss writes in the chat, through the routes the job cards already use (letter: /letter)
+WRITE_KINDS = ("message", "letter", "followup", "interview", "cv")
 # asked again at the very end, in that language (as message.WRITE_IN): with Portuguese rules and data around it,
 # the light model sometimes answered an English question in Portuguese, and an "unless…" clause was ignored
 ANSWER_IN = {"en": 'Write the "text" of your answer in English.',
@@ -144,7 +146,13 @@ Regras:
     ficar. positions são as palavras de área que o título tem de ter (nunca níveis como júnior ou estágio,
     que vão em levels); locations a zona; roles os cargos; levels de {levels}.
   - {{"type": "refresh"}}: procurar vagas agora.
-  - {{"type": "message", "uid": "..."}}: escrever a mensagem de candidatura para uma vaga.
+  - {{"type": "write", "kind": "message|letter|followup|interview|cv", "uid": "...", "language": "pt|en"}}: escrever um texto para
+    uma vaga. message é a mensagem curta de candidatura; letter a carta de apresentação formal; followup o
+    email de seguimento de uma candidatura sem resposta; interview a preparação da entrevista; cv o que
+    destacar no CV. Manda "language" só quando a pessoa pede uma língua. Escrever não muda nada e começa
+    logo, sem Confirmar: no texto dizes só, numa frase, o que vais escrever; o texto aparece a seguir.
+- A app já te apresentou na primeira mensagem: não te apresentes nem cumprimentes outra vez; responde
+  direto ao que te perguntam.
 - Para uma pesquisa por palavras ("quero um trabalho de X em Y"), primeiro mostras em "jobs" as vagas que
   já existem e encaixam; depois, se a procura não cobre o pedido, propões a ação "search".
 
@@ -168,8 +176,13 @@ def _action(action, known: set[str]) -> dict | None:
     if kind == "status":
         status = action.get("status")
         return {"type": kind, "uid": uid, "status": status} if has_job and status in STATUSES else None
-    if kind == "message":
-        return {"type": kind, "uid": uid} if has_job else None
+    if kind == "write":
+        if not has_job or action.get("kind") not in WRITE_KINDS:
+            return None
+        out = {"type": kind, "kind": action["kind"], "uid": uid}
+        if action.get("language") in ("pt", "en"):  # anything else: that field alone drops
+            out["language"] = action["language"]
+        return out
     if kind == "refresh":
         return {"type": kind}
     if kind != "search":
