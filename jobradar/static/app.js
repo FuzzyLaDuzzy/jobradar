@@ -412,6 +412,10 @@ const EN = {
   "Email de seguimento": "Follow-up email",
   "Preparação da entrevista": "Interview prep",
   "Ajustes ao CV": "CV adjustments",
+  "Desde a última vez: 1 vaga nova.": "Since last time: 1 new job.",
+  "Desde a última vez: {n} vagas novas.": "Since last time: {n} new jobs.",
+  "1 candidatura chegou aos 7 dias sem resposta.": "1 application reached 7 days with no reply.",
+  "{n} candidaturas chegaram aos 7 dias sem resposta.": "{n} applications reached 7 days with no reply.",
   "Mudar a procura:": "Change the search:",
   "Palavras de área": "Field words",
   "Zona": "Area",
@@ -439,6 +443,7 @@ function loadFilters() {
 const BLISS_KEY = "jobradar.bliss"; // the conversation with Bliss: only on this device, the last 50 messages
 const BLISS_KEEP = 50;
 const BLISS_HISTORY = 10; // the last messages that go to the AI
+const BLISS_SEEN_KEY = "jobradar.blissSeen"; // when the panel was last opened here: the summary says what changed since
 const BLISS_GREETING = () => ({ role: "bliss", text: "", local: true, greeting: true }); // written here, no AI call
 
 function loadBliss() {
@@ -1355,6 +1360,7 @@ createApp({
     openBliss(job = null) {
       if (!this.bliss.messages.length) this.bliss.messages = [BLISS_GREETING()];
       if (job) this.bliss.job = { uid: job.uid, title: job.title };
+      if (!this.loading) this.summarizeSinceLastOpen(); // with the jobs loaded: otherwise next time
       this.bliss.open = true;
       this.bliss.opening = true;
       setTimeout(() => (this.bliss.opening = false), 600);
@@ -1364,6 +1370,54 @@ createApp({
       }
       this.api("/api/keys").then((k) => (this.blissVoice = !!k.GEMINI_API_KEY)).catch(() => {});
       this.scrollBliss();
+    },
+
+    // what changed since the panel was last opened on this device, written by the app (no AI): a new summary
+    // replaces the previous one when nothing was said after it; the first opening ever just keeps the time
+    summarizeSinceLastOpen() {
+      let since = NaN;
+      try {
+        since = Date.parse(localStorage.getItem(BLISS_SEEN_KEY) || "");
+      } catch {
+        /* storage unavailable: no summary */
+      }
+      const now = Date.now();
+      const summary = since ? this.blissSummary(since, now) : null;
+      if (summary) {
+        const last = this.bliss.messages[this.bliss.messages.length - 1];
+        if (last && last.summary) this.bliss.messages.splice(-1, 1, summary);
+        else this.bliss.messages.push(summary);
+        this.saveBliss();
+      }
+      try {
+        localStorage.setItem(BLISS_SEEN_KEY, new Date(now).toISOString());
+      } catch {
+        /* storage unavailable */
+      }
+    },
+
+    // the jobs new since `since`, and the applications whose 7 days without a reply ended between `since` and
+    // `now` (not every one still waiting: that would show a summary at every opening); null when there's nothing
+    blissSummary(since, now) {
+      const fresh = this.jobs.filter((j) => j.status === "nova" && j.active && Date.parse(j.first_seen) > since)
+        .sort((a, b) => b.score - a.score);
+      const due = (j) => Date.parse(j.applied_at) + FOLLOW_UP_DAYS * 86400000;
+      const reached = this.jobs.filter((j) => j.status === "candidatei" && j.applied_at && due(j) > since && due(j) <= now)
+        .sort((a, b) => Date.parse(a.applied_at) - Date.parse(b.applied_at));
+      if (!fresh.length && !reached.length) return null;
+      const lines = [];
+      if (fresh.length) {
+        lines.push(fresh.length === 1 ? this.t("Desde a última vez: 1 vaga nova.")
+          : this.t("Desde a última vez: {n} vagas novas.", { n: fresh.length }));
+      }
+      if (reached.length) {
+        lines.push(reached.length === 1 ? this.t("1 candidatura chegou aos 7 dias sem resposta.")
+          : this.t("{n} candidaturas chegaram aos 7 dias sem resposta.", { n: reached.length }));
+      }
+      // the follow-up is a button: in the summary nothing is written until it's clicked
+      return { role: "bliss", local: true, summary: true, text: lines.join("\n"), jobs: fresh.slice(0, 3).map((j) => j.uid),
+        action: reached.length ? { type: "write", kind: "followup", uid: reached[0].uid } : null,
+        actionState: reached.length ? "pending" : null };
     },
 
     closeBliss() {
