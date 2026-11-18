@@ -95,6 +95,7 @@ LinkedIn, Indeed and Glassdoor are left out on purpose (see [Limitations](#limit
 - **Spots jobs that closed**: when a job disappears from its source, it's marked as no longer published.
 - **Português or English**: ☰ Menu → 🌐 changes the whole app, the error messages and what the AI writes for you.
 - **Light or dark**: ☰ Menu → ☾/☀ (until you choose, it follows your system).
+- **Bliss, the assistant**: the button in the corner opens a chat beside the list (the whole screen on a phone). Ask about your search and the app ("why do I have so few new jobs?", "which jobs should I look at first?"), or say what you're after ("I want a software engineer job in Braga"): Bliss shows the jobs you already have that fit and proposes changing the search. Nothing changes until you press **Confirm**, whether it's a job's status, the search, a new search or an application message. 🔊 reads an answer aloud with Gemini's voice. Bliss answers from a summary of your data (your profile, the jobs, the sources and what was cut, never your notes or contact details) and the conversation stays on your device. It needs the Gemini key, or the Claude key to write and the Gemini key for the voice.
 
 <p>
   <img src="docs/profile.png" alt="Your profile, filled in from a CV" width="49%">
@@ -284,6 +285,7 @@ jobradar/
   levels.py         the levels and job titles you're after: their words, and what each one keeps and scores
   scoring.py        keyword score + optional AI score (Gemini or Claude)
   message.py        application message and interview notes
+  bliss.py          Bliss, the assistant: a summary of your data, one AI call per message, the actions it may propose
   profile.py        the 👤 Profile screen: its fields, where they go in config.yaml, reading a CV with the AI
   skills.py         the 📊 Market screen: the skills the jobs ask for most
   i18n.py           Português / English
