@@ -253,7 +253,8 @@ def test_bliss_voice_out_of_free_quota_is_a_429(tmp_path, monkeypatch, make_clie
 
     monkeypatch.setattr(app_module.gemini, "speak", busy)
     out = tc.post("/api/bliss/voice", json={"text": "Olá"})
-    assert out.status_code == 429 and "limite" in out.json()["detail"]
+    assert out.status_code == 429
+    assert out.json()["detail"] == "A voz atingiu o limite do plano gratuito do Gemini; tenta daqui a um minuto."
 
 
 INDEX = (ROOT / "jobradar" / "static" / "index.html").read_text(encoding="utf-8")
@@ -266,3 +267,38 @@ def test_the_page_never_renders_html_from_the_ai():
 def test_bliss_image_and_button_exist():
     assert (ROOT / "jobradar" / "static" / "bliss.svg").exists()
     assert 'class="bliss-fab"' in INDEX and "openBliss()" in INDEX
+
+
+def test_snapshot_job_rows_keep_their_columns(tmp_path, cfg):
+    db = Database(tmp_path / "t.db")
+    plain = job("1", title="Junior Python Developer")
+    plain.location = ""  # no place and no salary: still one field per column
+    db.upsert(plain, 70, [], {}, NOW)
+    db.upsert(job("2", title="Estágio em Dados"), 40, [], {}, NOW)
+    db.update("lever:acme:2", status="candidatei")
+    db.conn.execute("UPDATE jobs SET active = 0 WHERE uid = 'lever:acme:2'")
+    text = bliss.snapshot(db, cfg, "olá")
+    rows = {line.split(" | ")[0]: line.split(" | ") for line in text.splitlines() if line.startswith("lever:acme:")}
+    assert len(rows["lever:acme:1"]) == 9 and rows["lever:acme:1"][3] == "-" and rows["lever:acme:1"][4] == "70"
+    assert len(rows["lever:acme:2"]) == 9 and "já não está publicada" in rows["lever:acme:2"][5]
+
+
+def test_parse_search_writes_place_and_area_words_as_the_profile_saves_them():
+    action = {"type": "search", "locations": ["Braga", "Guimarães"], "positions": ["Python", "Estágio", "junior"]}
+    out = bliss.parse(json.dumps({"text": "x", "jobs": [], "action": action}), KNOWN)["action"]
+    # lower case, as profile.clean saves them; level words belong in "levels", never in the area words
+    assert out == {"type": "search", "locations": ["braga", "guimarães"], "positions": ["python"]}
+
+
+def test_parse_search_with_only_level_words_as_area_drops_them():
+    action = {"type": "search", "positions": ["estágio", "Junior"]}
+    assert bliss.parse(json.dumps({"text": "x", "jobs": [], "action": action}), KNOWN)["action"] is None
+
+
+@pytest.mark.parametrize("reply", [
+    'Aqui está:\n```json\n{"text": "Olá", "jobs": [], "action": null}\n```',
+    '```JSON\n{"text": "Olá", "jobs": [], "action": null}\n```',
+    'Resposta: {"text": "Olá", "jobs": [], "action": null}',
+])
+def test_parse_finds_the_json_around_other_text(reply):
+    assert bliss.parse(reply, KNOWN)["text"] == "Olá"

@@ -73,9 +73,11 @@ def snapshot(db: Database, cfg: dict, question: str, job_uid: str | None = None,
     lines.append("uid | título | empresa | local | encaixe | estado | salário | publicada | fonte")
     for j in listed:
         pay = salary.of_job(j)
-        lines.append(_line(j["uid"], j["title"], j["company"], j["location"], j["score"], j["status"],
-                           pay and pay["text"], j["posted_at"], j["source"],
-                           "" if j["active"] else "já não está publicada"))
+        status = j["status"] if j["active"] else f"{j['status']} (já não está publicada)"
+        # one field per column, "-" when empty: a missing salary mustn't shift the date under "salário"
+        lines.append(" | ".join(str(f) if f not in (None, "") else "-" for f in (
+            j["uid"], j["title"], j["company"], j["location"], j["score"], status, pay and pay["text"],
+            j["posted_at"], j["source"])))
 
     cut = db.cut_jobs()
     lines.append("\n# Cortadas na última procura, por motivo")
@@ -120,8 +122,8 @@ Regras:
   - {{"type": "status", "uid": "...", "status": "..."}}: mudar o estado de uma vaga. Estados: {statuses}.
   - {{"type": "search", "positions": [...], "locations": [...], "roles": [...], "levels": [...],
     "allow_remote": true|false}}: mudar a procura; manda só os campos a mudar, cada lista inteira como deve
-    ficar. positions são as palavras de área que o título tem de ter; locations a zona; roles os cargos;
-    levels de {levels}.
+    ficar. positions são as palavras de área que o título tem de ter (nunca níveis como júnior ou estágio,
+    que vão em levels); locations a zona; roles os cargos; levels de {levels}.
   - {{"type": "refresh"}}: procurar vagas agora.
   - {{"type": "message", "uid": "..."}}: escrever a mensagem de candidatura para uma vaga.
 - Para uma pesquisa por palavras ("quero um trabalho de X em Y"), primeiro mostras em "jobs" as vagas que
@@ -155,7 +157,12 @@ def _action(action, known: set[str]) -> dict | None:
         return None
     out: dict = {"type": kind}
     for key in ("positions", "locations", "roles"):
-        if (value := _text_list(action.get(key))) is not None:
+        value = _text_list(action.get(key))
+        if value and key != "roles":  # as profile.clean saves them, so the card shows what really changes
+            value = [v.lower() for v in value]
+        if value and key == "positions":  # a level word as an area word would let in every junior job
+            value = [v for v in value if v not in profile.LEVEL_WORDS]
+        if value:
             out[key] = value
     wanted = action.get("levels")
     chosen = [lv for lv in wanted if lv in levels.LEVELS] if isinstance(wanted, list) else []
@@ -166,14 +173,12 @@ def _action(action, known: set[str]) -> dict | None:
     return out if len(out) > 1 else None  # nothing valid left to change
 
 
-_FENCE = re.compile(r"^\s*```(?:json)?\s*(.*?)\s*```\s*$", re.S)
-
-
 def parse(text: str, known: set[str]) -> dict:
-    """The AI's answer, checked: jobs that exist, and an action Bliss may propose. Not JSON: just a text."""
-    fenced = _FENCE.match(text)
+    """The AI's answer, checked: jobs that exist, and an action Bliss may propose. Not JSON: just a text.
+    The JSON is found inside whatever is around it (a sentence before it, a ```json fence), as in profile.read_cv."""
+    found = re.search(r"\{.*\}", text, re.S)
     try:
-        data = json.loads(fenced.group(1) if fenced else text)
+        data = json.loads(found.group(0)) if found else None
     except ValueError:
         data = None
     if not isinstance(data, dict) or not isinstance(data.get("text"), str):

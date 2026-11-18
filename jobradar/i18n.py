@@ -68,6 +68,8 @@ EN = {
     "O Gemini não devolveu texto ({reason}).": "Gemini returned no text ({reason}).",
     "O modelo recusou este pedido.": "The model declined this request.",
     "O modelo não devolveu nenhum texto.": "The model returned no text.",
+    "A voz atingiu o limite do plano gratuito do Gemini; tenta daqui a um minuto.":
+        "The voice has reached the Gemini free tier limit; try again in a minute.",
     # sources
     "{host} pede uma verificação de browser (proteção contra robôs), que o JobRadar não contorna. Se continuar, "
     "fala com o site ou tira esta fonte das Definições.":

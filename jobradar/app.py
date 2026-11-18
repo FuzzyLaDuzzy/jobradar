@@ -504,8 +504,10 @@ def create_app(
         try:
             audio = gemini.speak(body.text)
         except gemini.GeminiError as exc:
-            # the voice's own free quota is small: say so as a 429, so the app can say "in a minute"
-            raise HTTPException(429 if exc.status == 429 else 502, str(exc)) from exc
+            if exc.status == 429:  # the voice has its own small free quota, apart from the chat's
+                raise HTTPException(429, t("A voz atingiu o limite do plano gratuito do Gemini; tenta daqui a um "
+                                           "minuto.")) from exc
+            raise HTTPException(502, str(exc)) from exc
         return Response(content=audio, media_type="audio/wav")
 
     @app.patch("/api/jobs/{uid:path}")

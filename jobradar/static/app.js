@@ -1476,6 +1476,7 @@ createApp({
 
     stopSpeaking() {
       if (this.blissAudio) this.blissAudio.pause();
+      this.blissAudio = null; // a voice still loading sees this and doesn't start
       this.speaking = null;
     },
 
