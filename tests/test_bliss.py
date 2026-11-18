@@ -258,14 +258,18 @@ def test_bliss_voice_out_of_free_quota_is_a_429(tmp_path, monkeypatch, make_clie
 
 
 INDEX = (ROOT / "jobradar" / "static" / "index.html").read_text(encoding="utf-8")
+APP_JS = (ROOT / "jobradar" / "static" / "app.js").read_text(encoding="utf-8")
 
 
 def test_the_page_never_renders_html_from_the_ai():
     assert "v-html" not in INDEX  # Bliss's answers are shown as text
 
 
-def test_bliss_image_and_button_exist():
-    assert (ROOT / "jobradar" / "static" / "bliss.svg").exists()
+def test_bliss_face_is_a_component_in_the_page():
+    assert not (ROOT / "jobradar" / "static" / "bliss.svg").exists()
+    assert "/static/bliss.svg" not in INDEX
+    assert "<bliss-face" in INDEX and 'component("bliss-face"' in APP_JS
+    assert 'id="bliss-bg"' in INDEX  # the gradients, once, in the page
     assert 'class="bliss-fab"' in INDEX and "openBliss()" in INDEX
 
 

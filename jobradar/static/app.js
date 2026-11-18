@@ -468,6 +468,23 @@ function fileAsBase64(file) {
 }
 
 // A list of short words as removable tags: Enter, a comma or leaving the field adds what was typed.
+// Bliss's face, "Radar vivo" (the gradients #bliss-bg and #bliss-sweep are in index.html).
+// talking: while 🔊 reads an answer aloud, the smile becomes a mouth that moves (style.css)
+const BlissFace = {
+  props: { talking: Boolean },
+  template: `<svg viewBox="0 0 120 120" aria-hidden="true">
+    <circle cx="60" cy="60" r="56" fill="url(#bliss-bg)"/>
+    <circle cx="60" cy="60" r="42" fill="none" stroke="#fff" stroke-opacity=".14" stroke-width="2"/>
+    <circle cx="60" cy="60" r="25" fill="none" stroke="#fff" stroke-opacity=".1" stroke-width="2"/>
+    <path d="M60 60 L60 4 A56 56 0 0 1 108.5 32 Z" fill="url(#bliss-sweep)"/>
+    <rect x="40" y="45" width="11" height="17" rx="5.5" fill="#fff"/>
+    <rect x="69" y="45" width="11" height="17" rx="5.5" fill="#fff"/>
+    <ellipse v-if="talking" class="bliss-mouth" cx="60" cy="78" rx="11" ry="7" fill="#fff"/>
+    <path v-else d="M45 74 Q60 87 75 74" stroke="#fff" stroke-width="5" fill="none" stroke-linecap="round"/>
+    <circle cx="93" cy="31" r="6" fill="#ffd166"/>
+  </svg>`,
+};
+
 const ChipList = {
   props: { modelValue: Array, placeholder: String, label: String, removeLabel: String },
   emits: ["update:modelValue"],
@@ -563,7 +580,8 @@ createApp({
       // ⚡ triage: the new jobs one at a time; history: what was decided, for Undo; dx: how far a finger dragged the card
       triage: { open: false, queue: [], index: 0, history: [], dir: "", dx: 0, startX: null },
       // Bliss, the assistant: job is the one the conversation is about ({uid, title}); area is for the first suggestion
-      bliss: { open: false, messages: loadBliss(), busy: false, job: null, about: false, area: "", draft: "" },
+      bliss: { open: false, messages: loadBliss(), busy: false, job: null, about: false, area: "", draft: "",
+        opening: false }, // opening: the first moments after it opens, when the messages come in one by one
       blissVoice: false, // 🔊 needs GEMINI_API_KEY (Gemini's voice, whatever AI writes the answers)
       speaking: null, // the message being read aloud
       blissAudio: null,
@@ -1330,6 +1348,8 @@ createApp({
       if (!this.bliss.messages.length) this.bliss.messages = [BLISS_GREETING()];
       if (job) this.bliss.job = { uid: job.uid, title: job.title };
       this.bliss.open = true;
+      this.bliss.opening = true;
+      setTimeout(() => (this.bliss.opening = false), 600);
       this.menuOpen = false;
       if (!this.bliss.area) {
         this.api("/api/profile").then((p) => (this.bliss.area = (p.profile.locations || [])[0] || "")).catch(() => {});
@@ -1362,7 +1382,7 @@ createApp({
 
     scrollBliss() {
       this.$nextTick(() => {
-        const log = this.$refs.blissLog;
+        const log = this.$refs.blissLog && this.$refs.blissLog.$el; // a transition-group: its element
         if (log) log.scrollTop = log.scrollHeight;
       });
     },
@@ -1607,4 +1627,5 @@ createApp({
   },
 })
   .component("chip-list", ChipList)
+  .component("bliss-face", BlissFace)
   .mount("#app");
