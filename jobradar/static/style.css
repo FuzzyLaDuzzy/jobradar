@@ -492,6 +492,8 @@ details textarea.ai-text { min-height: 260px; }
 }
 .bliss-job:hover { border-color: var(--accent); }
 .bliss-suggestions .btn { text-align: left; white-space: normal; }
+.bliss-write-title { font-weight: 600; margin-bottom: 6px !important; }
+.bliss-write-buttons { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
 .bliss-action { margin-top: 8px; padding: 10px; border: 1px solid var(--accent); border-radius: 10px; background: var(--surface); }
 .bliss-action p { margin: 0 0 8px; white-space: pre-wrap; }
 .bliss-action p.muted { margin: 0; }

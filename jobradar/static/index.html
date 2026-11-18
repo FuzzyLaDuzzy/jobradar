@@ -587,7 +587,13 @@
            :style="{ '--i': bliss.opening ? Math.max(0, i - (bliss.messages.length - 8)) : 0 }">
         <bliss-face v-if="m.role === 'bliss'" class="bliss-face" :talking="speaking === m"></bliss-face>
         <div class="bliss-bubble">
-          <p>{{ blissText(m) }}</p>
+          <p class="bliss-write-title" v-if="m.write">✉ {{ writeName(m.write.kind) }} · {{ m.write.title }}</p>
+          <p v-if="m.writing" class="muted">{{ t('A escrever…') }}</p>
+          <p v-else>{{ blissText(m) }}</p>
+          <div class="bliss-write-buttons" v-if="m.write && !m.writing">
+            <button class="btn" v-if="!m.error" @click="copyText(m.text)">{{ t('Copiar') }}</button>
+            <button class="btn" @click="runWrite(m.write, m)">{{ t('Outra versão') }}</button>
+          </div>
           <div class="bliss-jobs" v-if="m.jobs && m.jobs.length">
             <button v-for="j in blissJobs(m)" :key="j.uid" class="bliss-job" @click="showJob(j)">
               <b>{{ j.title }}</b>
@@ -599,13 +605,13 @@
             <p>{{ actionSummary(m) }}</p>
             <div class="bliss-action-buttons" v-if="m.actionState === 'pending'">
               <button class="btn primary" @click="confirmAction(m)" :disabled="m.actionBusy || refreshing">
-                <span v-if="m.actionBusy" class="spinner"></span>{{ t('Confirmar') }}
+                <span v-if="m.actionBusy" class="spinner"></span>{{ ['write', 'message'].includes(m.action.type) ? t('Escrever') : t('Confirmar') }}
               </button>
               <button class="btn" @click="dismissAction(m)" :disabled="m.actionBusy">{{ t('Agora não') }}</button>
             </div>
             <p v-else class="muted small">{{ t('✓ Feito') }}</p>
           </div>
-          <button v-if="m.role === 'bliss' && !m.error && blissVoice" class="bliss-say" @click="speak(m)"
+          <button v-if="m.role === 'bliss' && !m.error && !m.write && blissVoice" class="bliss-say" @click="speak(m)"
                   :title="speaking === m ? t('Parar') : t('Ouvir')" :aria-label="speaking === m ? t('Parar') : t('Ouvir')">
             {{ speaking === m ? '⏹' : '🔊' }}
             <span v-if="speaking === m" class="bliss-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>

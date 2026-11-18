@@ -403,7 +403,15 @@ const EN = {
   "✓ Feito": "✓ Done",
   "Mudar «{title}» para {status}": "Change «{title}» to {status}",
   "Procurar vagas agora": "Search for jobs now",
-  "Escrever a mensagem de candidatura para «{title}»": "Write the application message for «{title}»",
+  "✉ {kind} para «{title}»": "✉ {kind} for «{title}»",
+  "Escrever": "Write",
+  "Outra versão": "Another version",
+  "Vaga não encontrada": "Job not found",
+  "Mensagem de candidatura": "Application message",
+  "Carta de apresentação": "Cover letter",
+  "Email de seguimento": "Follow-up email",
+  "Preparação da entrevista": "Interview prep",
+  "Ajustes ao CV": "CV adjustments",
   "Mudar a procura:": "Change the search:",
   "Palavras de área": "Field words",
   "Zona": "Area",
@@ -1373,7 +1381,7 @@ createApp({
 
     saveBliss() {
       try {
-        const kept = this.bliss.messages.slice(-BLISS_KEEP).map(({ audio, actionBusy, ...m }) => m);
+        const kept = this.bliss.messages.slice(-BLISS_KEEP).map(({ audio, actionBusy, writing, ...m }) => m);
         localStorage.setItem(BLISS_KEY, JSON.stringify(kept));
       } catch {
         /* storage unavailable: the conversation just won't be there next time */
@@ -1404,10 +1412,12 @@ createApp({
           body: JSON.stringify({ messages: history, job: this.bliss.job && this.bliss.job.uid }),
         });
         for (const j of out.jobs) if (!this.jobs.some((x) => x.uid === j.uid)) this.jobs.push(j);
-        const said = { role: "bliss", text: out.text, jobs: out.jobs.map((j) => j.uid), action: out.action,
-          actionState: out.action ? "pending" : null };
+        const writing = out.action && out.action.type === "write" ? out.action : null; // changes nothing: starts now
+        const said = { role: "bliss", text: out.text, jobs: out.jobs.map((j) => j.uid), action: writing ? null : out.action,
+          actionState: out.action && !writing ? "pending" : null };
         if (out.action && out.action.type === "search") said.before = (await this.api("/api/profile")).profile;
         this.bliss.messages.push(said);
+        if (writing) this.runWrite(writing);
       } catch (e) {
         // the question goes back to the box, to send again
         this.bliss.messages.splice(this.bliss.messages.indexOf(asked), 1);
@@ -1434,7 +1444,9 @@ createApp({
         return this.t("Mudar «{title}» para {status}", { title, status });
       }
       if (a.type === "refresh") return this.t("Procurar vagas agora");
-      if (a.type === "message") return this.t("Escrever a mensagem de candidatura para «{title}»", { title });
+      if (a.type === "write" || a.type === "message") {
+        return this.t("✉ {kind} para «{title}»", { kind: this.writeName(a.kind || "message"), title });
+      }
       const names = { positions: this.t("Palavras de área"), locations: this.t("Zona"), roles: this.t("Cargos"), levels: this.t("Níveis") };
       const label = (key, v) => (key === "levels" ? this.t((LEVELS.find((l) => l.id === v) || { name: v }).name) : v);
       const lines = [this.t("Mudar a procura:")];
@@ -1471,12 +1483,8 @@ createApp({
           const fresh = this.jobs.filter((j) => !before.has(j.uid));
           this.bliss.messages.push({ role: "bliss", local: true, jobs: fresh.map((j) => j.uid),
             text: fresh.length ? this.t("Encontrei {n} vagas novas.", { n: fresh.length }) : this.t("Sem vagas novas desde a última procura") });
-        } else if (a.type === "message") {
-          const job = this.jobs.find((j) => j.uid === a.uid);
-          if (job) {
-            this.showJob(job);
-            this.generate(job, "message");
-          }
+        } else if (a.type === "write" || a.type === "message") { // "message": an old one, kept on the device
+          this.runWrite({ kind: a.kind || "message", uid: a.uid, language: a.language });
         }
       } catch (e) {
         done = false;
@@ -1524,6 +1532,42 @@ createApp({
       } catch (e) {
         if (this.speaking === m) this.speaking = null;
         this.showToast(e.name === "NotAllowedError" ? this.t("Toca outra vez no 🔊 para ouvir.") : e.message);
+      }
+    },
+
+    writeName(kind) {
+      return {
+        message: this.t("Mensagem de candidatura"), letter: this.t("Carta de apresentação"),
+        followup: this.t("Email de seguimento"), interview: this.t("Preparação da entrevista"), cv: this.t("Ajustes ao CV"),
+      }[kind] || kind;
+    },
+
+    // Bliss writes one of the five texts in the chat, through the routes the job cards use (letter: /letter).
+    // into: "Another version" in that message; otherwise a new one. Written texts are local: never sent to the AI.
+    async runWrite(action, into = null) {
+      const job = this.jobs.find((j) => j.uid === action.uid);
+      if (!into) {
+        this.bliss.messages.push({ role: "bliss", local: true, text: "",
+          write: { kind: action.kind, uid: action.uid, language: action.language || null, title: job ? job.title : action.uid } });
+      }
+      const m = into || this.bliss.messages[this.bliss.messages.length - 1]; // the reactive one
+      if (!job) {
+        Object.assign(m, { error: true, text: this.t("Vaga não encontrada") });
+        this.saveBliss();
+        return;
+      }
+      Object.assign(m, { writing: true, error: false });
+      this.scrollBliss();
+      try {
+        const { kind, language } = m.write;
+        const query = language && ["message", "letter", "followup"].includes(kind) ? `?language=${language}` : "";
+        m.text = (await this.api(`/api/jobs/${encodeURIComponent(job.uid)}/${kind}${query}`, { method: "POST" })).text;
+      } catch (e) {
+        Object.assign(m, { error: true, text: e.message });
+      } finally {
+        m.writing = false;
+        this.saveBliss();
+        this.scrollBliss();
       }
     },
 
