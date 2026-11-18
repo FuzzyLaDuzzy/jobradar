@@ -374,6 +374,31 @@ const EN = {
   "função pretendida": "your role",
   "estágio profissional": "professional internship",
   "zona preferida": "preferred area",
+  // Bliss, the assistant
+  "Falar com o Bliss": "Talk to Bliss",
+  "Bliss, o assistente do JobRadar": "Bliss, JobRadar's assistant",
+  "Sobre o Bliss": "About Bliss",
+  "Nova conversa": "New conversation",
+  "Fechar": "Close",
+  "O Bliss foi criado por Flávio Silva, mestre em Engenharia Informática pela Universidade do Minho, que também fez o JobRadar.":
+    "Bliss was made by Flávio Silva, MSc in Informatics Engineering from the University of Minho, who also made JobRadar.",
+  "Portefólio": "Portfolio",
+  "As respostas vêm da IA escolhida no ⚙, com um resumo dos teus dados (sem as notas nem os teus contactos). A conversa fica só neste aparelho.":
+    "The answers come from the AI chosen in ⚙, with a summary of your data (without your notes or contact details). The conversation stays on this device only.",
+  "Tirar esta vaga da conversa": "Take this job out of the conversation",
+  "Olá! Sou o Bliss, o assistente do JobRadar, criado por Flávio Silva. Pergunta-me o que quiseres sobre a tua procura de emprego ou sobre a app.":
+    "Hi! I'm Bliss, JobRadar's assistant, made by Flávio Silva. Ask me anything about your job search or the app.",
+  "O Bliss está a escrever…": "Bliss is typing…",
+  "Escreve ao Bliss…": "Write to Bliss…",
+  "Mensagem para o Bliss": "Message to Bliss",
+  "Enviar": "Send",
+  "💬 Perguntar ao Bliss sobre esta vaga": "💬 Ask Bliss about this job",
+  "Quero um trabalho de software engineer na zona de {area}": "I want a software engineer job in the {area} area",
+  "Quero um trabalho de software engineer": "I want a software engineer job",
+  "Que vagas devo ver primeiro?": "Which jobs should I look at first?",
+  "Porque tenho poucas vagas novas?": "Why do I have few new jobs?",
+  "A vaga está escondida pelos filtros: limpa os filtros para a ver.":
+    "The job is hidden by the filters: clear them to see it.",
 };
 
 function loadFilters() {
@@ -381,6 +406,20 @@ function loadFilters() {
     return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
   } catch {
     return {};
+  }
+}
+
+const BLISS_KEY = "jobradar.bliss"; // the conversation with Bliss: only on this device, the last 50 messages
+const BLISS_KEEP = 50;
+const BLISS_HISTORY = 10; // the last messages that go to the AI
+const BLISS_GREETING = () => ({ role: "bliss", text: "", local: true, greeting: true }); // written here, no AI call
+
+function loadBliss() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(BLISS_KEY) || "[]");
+    return Array.isArray(saved) ? saved : [];
+  } catch {
+    return [];
   }
 }
 
@@ -504,10 +543,25 @@ createApp({
       toast: "",
       // ⚡ triage: the new jobs one at a time; history: what was decided, for Undo; dx: how far a finger dragged the card
       triage: { open: false, queue: [], index: 0, history: [], dir: "", dx: 0, startX: null },
+      // Bliss, the assistant: job is the one the conversation is about ({uid, title}); area is for the first suggestion
+      bliss: { open: false, messages: loadBliss(), busy: false, job: null, about: false, area: "", draft: "" },
     };
   },
 
   computed: {
+    // a window is open: Bliss's button steps aside
+    anyModal() {
+      return this.sourcesOpen || this.settingsOpen || this.addOpen || this.keysOpen || this.follow.open ||
+        this.marketOpen || this.profileOpen || this.triage.open;
+    },
+    blissSuggestions() {
+      const area = this.bliss.area && this.bliss.area[0].toUpperCase() + this.bliss.area.slice(1); // "braga" → "Braga"
+      return [
+        area ? this.t("Quero um trabalho de software engineer na zona de {area}", { area }) : this.t("Quero um trabalho de software engineer"),
+        this.t("Que vagas devo ver primeiro?"),
+        this.t("Porque tenho poucas vagas novas?"),
+      ];
+    },
     darkNow() {
       return this.theme ? this.theme === "dark" : this.systemDark;
     },
@@ -639,6 +693,10 @@ createApp({
     minSalary: "persist",
     cutReason() {
       this.cutLimit = 100;
+    },
+    // on a wide screen the list moves aside for the panel (style.css)
+    "bliss.open"(open) {
+      document.body.classList.toggle("bliss-open", open);
     },
   },
 
@@ -1245,6 +1303,92 @@ createApp({
       }
     },
 
+    // Bliss: the panel opens with its greeting; job: "Ask Bliss about this job"
+    openBliss(job = null) {
+      if (!this.bliss.messages.length) this.bliss.messages = [BLISS_GREETING()];
+      if (job) this.bliss.job = { uid: job.uid, title: job.title };
+      this.bliss.open = true;
+      this.menuOpen = false;
+      if (!this.bliss.area) {
+        this.api("/api/profile").then((p) => (this.bliss.area = (p.profile.locations || [])[0] || "")).catch(() => {});
+      }
+      this.scrollBliss();
+    },
+
+    closeBliss() {
+      this.bliss.open = false;
+    },
+
+    newBlissChat() {
+      this.bliss.messages = [BLISS_GREETING()];
+      this.bliss.job = null;
+      this.saveBliss();
+    },
+
+    saveBliss() {
+      try {
+        localStorage.setItem(BLISS_KEY, JSON.stringify(this.bliss.messages.slice(-BLISS_KEEP)));
+      } catch {
+        /* storage unavailable: the conversation just won't be there next time */
+      }
+    },
+
+    scrollBliss() {
+      this.$nextTick(() => {
+        const log = this.$refs.blissLog;
+        if (log) log.scrollTop = log.scrollHeight;
+      });
+    },
+
+    async sendBliss(text) {
+      text = (text || "").trim();
+      if (!text || this.bliss.busy) return;
+      const asked = { role: "user", text };
+      this.bliss.messages.push(asked);
+      this.bliss.draft = "";
+      this.bliss.busy = true;
+      this.scrollBliss();
+      // the last ones, as text only: never the greeting, the errors or empty answers
+      const history = this.bliss.messages.filter((m) => !m.local && !m.error && m.text).slice(-BLISS_HISTORY)
+        .map(({ role, text }) => ({ role, text: text.slice(0, 4000) }));
+      try {
+        const out = await this.api("/api/bliss", {
+          method: "POST",
+          body: JSON.stringify({ messages: history, job: this.bliss.job && this.bliss.job.uid }),
+        });
+        for (const j of out.jobs) if (!this.jobs.some((x) => x.uid === j.uid)) this.jobs.push(j);
+        this.bliss.messages.push({ role: "bliss", text: out.text, jobs: out.jobs.map((j) => j.uid), action: out.action,
+          actionState: out.action ? "pending" : null });
+      } catch (e) {
+        // the question goes back to the box, to send again
+        this.bliss.messages.splice(this.bliss.messages.indexOf(asked), 1);
+        this.bliss.draft = text;
+        this.bliss.messages.push({ role: "bliss", text: e.message, error: true });
+      } finally {
+        this.bliss.busy = false;
+        this.saveBliss();
+        this.scrollBliss();
+      }
+    },
+
+    blissJobs(m) {
+      return (m.jobs || []).map((uid) => this.jobs.find((j) => j.uid === uid)).filter(Boolean);
+    },
+
+    // a job card in the chat: the job in the list, with its description open
+    showJob(job) {
+      if (window.matchMedia("(max-width: 720px)").matches) this.closeBliss();
+      const switching = this.tab !== this.tabOf(job);
+      this.tab = this.tabOf(job);
+      job.descOpen = true;
+      // a new tab animates its list in, and the old tab's copy of the card stays until it has faded out
+      setTimeout(() => {
+        const card = document.getElementById("job-" + job.uid);
+        if (card) card.scrollIntoView({ block: "start" }); // a smooth scroll doesn't always run (some webviews)
+        else this.showToast(this.t("A vaga está escondida pelos filtros: limpa os filtros para a ver."));
+      }, switching ? 450 : 0);
+    },
+
     showToast(message) {
       this.toast = message;
       clearTimeout(this._toastTimer);
@@ -1315,7 +1459,11 @@ createApp({
     this.load();
     // ☰ Menu: a click anywhere (one of its items too) or Esc closes it; its own button stops the click
     document.addEventListener("click", () => (this.menuOpen = false));
-    document.addEventListener("keydown", (e) => e.key === "Escape" && (this.menuOpen = false));
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      this.menuOpen = false;
+      if (this.bliss.open && !this.anyModal) this.closeBliss();
+    });
     // links straight to a screen: /#mercado, /#perfil
     if (location.hash === "#mercado") this.openMarket();
     else if (location.hash === "#perfil") this.openProfile();

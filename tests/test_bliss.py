@@ -254,3 +254,15 @@ def test_bliss_voice_out_of_free_quota_is_a_429(tmp_path, monkeypatch, make_clie
     monkeypatch.setattr(app_module.gemini, "speak", busy)
     out = tc.post("/api/bliss/voice", json={"text": "Olá"})
     assert out.status_code == 429 and "limite" in out.json()["detail"]
+
+
+INDEX = (ROOT / "jobradar" / "static" / "index.html").read_text(encoding="utf-8")
+
+
+def test_the_page_never_renders_html_from_the_ai():
+    assert "v-html" not in INDEX  # Bliss's answers are shown as text
+
+
+def test_bliss_image_and_button_exist():
+    assert (ROOT / "jobradar" / "static" / "bliss.svg").exists()
+    assert 'class="bliss-fab"' in INDEX and "openBliss()" in INDEX

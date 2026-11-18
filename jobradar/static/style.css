@@ -447,3 +447,53 @@ details textarea.ai-text { min-height: 260px; }
   .tabs { scrollbar-width: none; }  /* they still scroll sideways */
   .sheet .triage-actions { grid-template-columns: 1fr 1fr; }
 }
+
+/* Bliss, the assistant: the button in the corner and the chat beside the list */
+.bliss-fab {
+  position: fixed; right: 20px; bottom: 20px; width: 58px; height: 58px; padding: 0; border: 0; border-radius: 18px;
+  background: none; cursor: pointer; box-shadow: 0 6px 18px rgba(0, 0, 0, .25); z-index: 9; transition: transform .15s;
+}
+.bliss-fab:hover { transform: scale(1.06); }
+.bliss-fab img { width: 100%; height: 100%; display: block; }
+.bliss {
+  position: fixed; top: 0; right: 0; bottom: 0; width: 380px; max-width: 100%; display: flex; flex-direction: column;
+  background: var(--surface); border-left: 1px solid var(--border); box-shadow: -6px 0 24px rgba(0, 0, 0, .12); z-index: 9;
+  animation: fade-in .2s ease-out;
+}
+.bliss header { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.bliss-tools { margin-left: auto; display: flex; gap: 2px; }
+.bliss-face { width: 30px; height: 30px; flex: none; }
+.bliss-about, .bliss-focus { padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 13px; background: var(--surface-2); }
+.bliss-about p { margin: 0 0 6px; }
+.bliss-about p:last-child { margin: 0; }
+.bliss-focus { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.bliss-log { flex: 1; overflow-y: auto; padding: 14px 12px; display: flex; flex-direction: column; gap: 12px; }
+.bliss-msg { display: flex; gap: 8px; align-items: flex-start; }
+.bliss-msg.from-user { justify-content: flex-end; }
+.bliss-bubble { max-width: 85%; background: var(--surface-2); border-radius: 4px 14px 14px 14px; padding: 9px 12px; font-size: 14px; }
+.bliss-msg.from-user .bliss-bubble { background: var(--accent); color: var(--accent-ink); border-radius: 14px 4px 14px 14px; }
+.bliss-msg.error .bliss-bubble { background: var(--warn-bg); color: var(--warn); }
+.bliss-bubble p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.bliss-jobs, .bliss-suggestions { display: grid; gap: 6px; margin-top: 8px; }
+.bliss-job {
+  display: grid; gap: 2px; padding: 8px 10px; text-align: left; font: inherit; color: var(--text); cursor: pointer;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+}
+.bliss-job:hover { border-color: var(--accent); }
+.bliss-suggestions .btn { text-align: left; white-space: normal; }
+.bliss-input { display: flex; gap: 8px; align-items: flex-end; padding: 10px 12px; border-top: 1px solid var(--border); }
+.bliss-input textarea {
+  flex: 1; resize: none; font: inherit; padding: 9px 11px; color: var(--text); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 10px;
+}
+.typing span { display: inline-block; width: 6px; height: 6px; margin: 0 2px; border-radius: 50%; background: var(--muted); animation: typing 1s infinite; }
+.typing span:nth-child(2) { animation-delay: .2s; }
+.typing span:nth-child(3) { animation-delay: .4s; }
+@keyframes typing { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+/* a wide screen keeps the whole list in view beside the panel */
+@media (min-width: 900px) { body.bliss-open #app { margin-right: max(380px, calc((100vw - 1080px) / 2)); } }
+@media (max-width: 720px) {
+  .bliss { width: 100%; border-left: 0; }
+  .bliss-fab { right: 14px; bottom: 14px; width: 52px; height: 52px; }
+  #app { padding-bottom: 96px; }  /* the button never covers the last card */
+}

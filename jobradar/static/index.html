@@ -139,7 +139,7 @@
     </div>
 
     <transition-group tag="div" name="card" class="cards" :key="tab" appear>
-    <article v-for="(j, index) in filtered" :key="j.uid" class="card" :style="{ '--i': Math.min(index, 12) }"
+    <article v-for="(j, index) in filtered" :key="j.uid" :id="'job-' + j.uid" class="card" :style="{ '--i': Math.min(index, 12) }"
              :class="{ inactive: !j.active, done: inApplications(j), rejected: j.status === 'rejeitada' }">
       <div class="score" :class="scoreClass(j.score)" :title="scoreTitle(j)" :style="{ '--offset': 100 - j.score }">
         <svg viewBox="0 0 50 50" aria-hidden="true"><circle class="track" cx="25" cy="25" r="22"/><circle class="arc" cx="25" cy="25" r="22" pathLength="100"/></svg>
@@ -205,6 +205,7 @@
                 <span v-if="j.cvBusy" class="spinner"></span>
                 {{ j.cvBusy ? t('A analisar…') : (j.cv ? t('↻ Analisar de novo') : t('🧩 Ajustar o CV')) }}
               </button>
+              <button class="btn" @click="openBliss(j)">{{ t('💬 Perguntar ao Bliss sobre esta vaga') }}</button>
               <button class="btn" v-if="canFollow(j)" @click="findCompany(j.company)"
                       :title="t('Procurar o site de carreiras da {company} e receber as vagas dela diretamente', { company: j.company })">{{ t('＋ Seguir empresa') }}</button>
             </div>
@@ -543,6 +544,63 @@
       </footer>
     </form>
   </div>
+
+  <!-- Bliss, the assistant: the button in the corner opens the chat beside the list (the whole screen on a phone) -->
+  <button class="bliss-fab" v-if="!bliss.open && !anyModal" @click="openBliss()"
+          :aria-label="t('Falar com o Bliss')" :title="t('Falar com o Bliss')">
+    <img src="/static/bliss.svg" alt="">
+  </button>
+  <aside class="bliss" v-if="bliss.open" :aria-label="t('Bliss, o assistente do JobRadar')">
+    <header>
+      <img src="/static/bliss.svg" alt="" class="bliss-face">
+      <b>Bliss</b>
+      <span class="bliss-tools">
+        <button class="btn icon ghost" @click="bliss.about = !bliss.about" :aria-pressed="bliss.about"
+                :title="t('Sobre o Bliss')">ⓘ</button>
+        <button class="btn icon ghost" @click="newBlissChat" :title="t('Nova conversa')">🗑</button>
+        <button class="btn icon ghost" @click="closeBliss" :title="t('Fechar')">✕</button>
+      </span>
+    </header>
+    <div class="bliss-about" v-if="bliss.about">
+      <p>{{ t('O Bliss foi criado por Flávio Silva, mestre em Engenharia Informática pela Universidade do Minho, que também fez o JobRadar.') }}</p>
+      <p>
+        <a href="https://github.com/FuzzyLaDuzzy" target="_blank" rel="noopener">GitHub</a> ·
+        <a href="https://fuzzyladuzzy.github.io" target="_blank" rel="noopener">{{ t('Portefólio') }}</a> ·
+        <a href="https://www.linkedin.com/in/fl%C3%A1vio-alex-silva" target="_blank" rel="noopener">LinkedIn</a>
+      </p>
+      <p class="muted small">{{ t('As respostas vêm da IA escolhida no ⚙, com um resumo dos teus dados (sem as notas nem os teus contactos). A conversa fica só neste aparelho.') }}</p>
+    </div>
+    <div class="bliss-focus" v-if="bliss.job">
+      <span>💬 {{ bliss.job.title }}</span>
+      <button class="btn icon ghost" @click="bliss.job = null" :title="t('Tirar esta vaga da conversa')">✕</button>
+    </div>
+    <div class="bliss-log" ref="blissLog" aria-live="polite">
+      <div v-for="(m, i) in bliss.messages" :key="i" class="bliss-msg" :class="['from-' + m.role, { error: m.error }]">
+        <img v-if="m.role === 'bliss'" src="/static/bliss.svg" alt="" class="bliss-face">
+        <div class="bliss-bubble">
+          <p>{{ m.greeting ? t('Olá! Sou o Bliss, o assistente do JobRadar, criado por Flávio Silva. Pergunta-me o que quiseres sobre a tua procura de emprego ou sobre a app.') : m.text }}</p>
+          <div class="bliss-jobs" v-if="m.jobs && m.jobs.length">
+            <button v-for="j in blissJobs(m)" :key="j.uid" class="bliss-job" @click="showJob(j)">
+              <b>{{ j.title }}</b>
+              <span class="muted small">{{ j.company }} · {{ j.location || t('Localização por confirmar') }} · {{ j.score }}</span>
+            </button>
+          </div>
+          <div class="bliss-suggestions" v-if="m.greeting && i === bliss.messages.length - 1">
+            <button v-for="s in blissSuggestions" :key="s" class="btn" @click="sendBliss(s)" :disabled="bliss.busy">{{ s }}</button>
+          </div>
+        </div>
+      </div>
+      <div class="bliss-msg from-bliss" v-if="bliss.busy">
+        <img src="/static/bliss.svg" alt="" class="bliss-face">
+        <div class="bliss-bubble typing" :aria-label="t('O Bliss está a escrever…')"><span></span><span></span><span></span></div>
+      </div>
+    </div>
+    <form class="bliss-input" @submit.prevent="sendBliss(bliss.draft)">
+      <textarea v-model="bliss.draft" rows="2" maxlength="4000" :placeholder="t('Escreve ao Bliss…')"
+                :aria-label="t('Mensagem para o Bliss')" @keydown.enter.exact.prevent="sendBliss(bliss.draft)"></textarea>
+      <button class="btn primary" :disabled="bliss.busy || !bliss.draft.trim()">{{ t('Enviar') }}</button>
+    </form>
+  </aside>
 
   <div class="toast" v-if="toast">{{ toast }}</div>
 </div>
