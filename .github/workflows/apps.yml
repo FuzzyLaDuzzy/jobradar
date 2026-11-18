@@ -71,6 +71,17 @@ jobs:
           restore-keys: |
             p4a-${{ matrix.arch }}-${{ hashFiles('android/buildozer.spec') }}-
             p4a-${{ matrix.arch }}-
+      # the libraries Gradle downloads from Maven Central: with four builds asking for them at once (the
+      # main and tag runs of a release), its rate limit (429 "Too Many Requests") failed a build
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ matrix.arch }}-${{ hashFiles('android/buildozer.spec') }}-${{ github.run_id }}
+          restore-keys: |
+            gradle-${{ matrix.arch }}-${{ hashFiles('android/buildozer.spec') }}-
+            gradle-${{ matrix.arch }}-
       # python-for-android makes a venv for its pip installs and doesn't expect one to be there already:
       # making it over the cached one puts the bundled pip back over the upgraded one, half-mixed
       - run: rm -rf android/.buildozer/android/platform/build-*/build/venv
