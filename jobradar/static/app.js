@@ -407,6 +407,7 @@ const EN = {
   "Escrever": "Write",
   "Outra versão": "Another version",
   "Vaga não encontrada": "Job not found",
+  "Não foi possível escrever outra versão: {error}": "Couldn't write another version: {error}",
   "Mensagem de candidatura": "Application message",
   "Carta de apresentação": "Cover letter",
   "Email de seguimento": "Follow-up email",
@@ -1374,20 +1375,29 @@ createApp({
 
     // what changed since the panel was last opened on this device, written by the app (no AI): a new summary
     // replaces the previous one when nothing was said after it; the first opening ever just keeps the time
-    summarizeSinceLastOpen() {
+    async summarizeSinceLastOpen() {
       let since = NaN;
       try {
         since = Date.parse(localStorage.getItem(BLISS_SEEN_KEY) || "");
       } catch {
         /* storage unavailable: no summary */
       }
+      // the list as it is now: the scheduled search may have added jobs since the page loaded
+      let jobs;
+      try {
+        jobs = await this.api("/api/jobs");
+      } catch {
+        return; // keep the old time: the next opening tries again
+      }
+      for (const j of jobs) if (!this.jobs.some((x) => x.uid === j.uid)) this.jobs.push(j);
       const now = Date.now();
-      const summary = since ? this.blissSummary(since, now) : null;
+      const summary = since ? this.blissSummary(since, now, jobs) : null;
       if (summary) {
         const last = this.bliss.messages[this.bliss.messages.length - 1];
         if (last && last.summary) this.bliss.messages.splice(-1, 1, summary);
         else this.bliss.messages.push(summary);
         this.saveBliss();
+        this.scrollBliss();
       }
       try {
         localStorage.setItem(BLISS_SEEN_KEY, new Date(now).toISOString());
@@ -1398,11 +1408,11 @@ createApp({
 
     // the jobs new since `since`, and the applications whose 7 days without a reply ended between `since` and
     // `now` (not every one still waiting: that would show a summary at every opening); null when there's nothing
-    blissSummary(since, now) {
-      const fresh = this.jobs.filter((j) => j.status === "nova" && j.active && Date.parse(j.first_seen) > since)
+    blissSummary(since, now, jobs = this.jobs) {
+      const fresh = jobs.filter((j) => j.status === "nova" && j.active && Date.parse(j.first_seen) > since)
         .sort((a, b) => b.score - a.score);
       const due = (j) => Date.parse(j.applied_at) + FOLLOW_UP_DAYS * 86400000;
-      const reached = this.jobs.filter((j) => j.status === "candidatei" && j.applied_at && due(j) > since && due(j) <= now)
+      const reached = jobs.filter((j) => j.status === "candidatei" && j.applied_at && due(j) > since && due(j) <= now)
         .sort((a, b) => Date.parse(a.applied_at) - Date.parse(b.applied_at));
       if (!fresh.length && !reached.length) return null;
       const lines = [];
@@ -1569,7 +1579,8 @@ createApp({
       const audio = new Audio(); // made in the tap itself: a phone's webview only plays sound a tap started
       this.blissAudio = audio;
       this.speaking = m;
-      audio.onended = () => this.speaking === m && (this.speaking = null);
+      // ended, or paused from outside (media controls, a call), or failed: the face stops talking
+      audio.onended = audio.onpause = audio.onerror = () => this.speaking === m && (this.speaking = null);
       try {
         if (!m.audio) {
           const res = await fetch("/api/bliss/voice", { method: "POST", headers: { "Content-Type": "application/json" },
@@ -1605,24 +1616,30 @@ createApp({
           write: { kind: action.kind, uid: action.uid, language: action.language || null, title: job ? job.title : action.uid } });
       }
       const m = into || this.bliss.messages[this.bliss.messages.length - 1]; // the reactive one
-      if (!job) {
-        Object.assign(m, { error: true, text: this.t("Vaga não encontrada") });
-        this.saveBliss();
-        return;
-      }
+      const kept = into && !into.error && into.text; // "Another version" that fails keeps the text it had
       Object.assign(m, { writing: true, error: false });
       this.scrollBliss();
       try {
+        // the server knows the job even when the list no longer shows it, and answers 404 when it's gone
         const { kind, language } = m.write;
         const query = language && ["message", "letter", "followup"].includes(kind) ? `?language=${language}` : "";
-        m.text = (await this.api(`/api/jobs/${encodeURIComponent(job.uid)}/${kind}${query}`, { method: "POST" })).text;
+        m.text = (await this.api(`/api/jobs/${encodeURIComponent(action.uid)}/${kind}${query}`, { method: "POST" })).text;
       } catch (e) {
-        Object.assign(m, { error: true, text: e.message });
+        if (kept) this.showToast(this.t("Não foi possível escrever outra versão: {error}", { error: e.message }));
+        else Object.assign(m, { error: true, text: e.message });
       } finally {
         m.writing = false;
         this.saveBliss();
-        this.scrollBliss();
+        this.scrollToMessage(m); // a long text starts at its top, not at the sign-off
       }
+    },
+
+    scrollToMessage(m) {
+      this.$nextTick(() => {
+        const log = this.$refs.blissLog && this.$refs.blissLog.$el;
+        const el = log && log.querySelectorAll(".bliss-msg")[this.bliss.messages.indexOf(m)];
+        if (el) log.scrollTop = el.offsetTop - log.offsetTop - 8;
+      });
     },
 
     blissJobs(m) {

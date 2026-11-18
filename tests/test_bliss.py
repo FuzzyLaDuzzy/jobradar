@@ -346,3 +346,9 @@ def test_system_lists_the_write_kinds_and_no_second_greeting():
     assert "|".join(bliss.WRITE_KINDS) in bliss.SYSTEM  # "message|letter|followup|interview|cv"
     assert "não te apresentes" in bliss.SYSTEM
     assert '"type": "message"' not in bliss.SYSTEM
+
+
+def test_system_only_asks_for_a_language_when_the_person_does():
+    # with "language" in the example, the light model filled it from the chat and the letter left the posting's language
+    assert '"language": "pt|en"' not in bliss.SYSTEM
+    assert 'junta "language": "pt" ou "en" só se a pessoa pedir uma língua' in bliss.SYSTEM
