@@ -82,7 +82,7 @@ class LinkBody(BaseModel):
 
 
 def _salary(job: dict) -> dict | None:
-    return salary.find(" ".join([job.get("title") or "", job.get("contract") or "", job.get("description") or ""]))
+    return salary.of_job(job)
 
 
 def _cell(value) -> str:

@@ -36,6 +36,11 @@ def _number(digits: str, thousands: str) -> float:
     return value * 1000 if thousands else value
 
 
+def of_job(job: dict) -> dict | None:
+    """The salary written in a job's title, contract or description."""
+    return find(" ".join([job.get("title") or "", job.get("contract") or "", job.get("description") or ""]))
+
+
 def find(text: str) -> dict | None:
     """{"text": as written in the posting, "min"/"max": per month in euros, "period": "month" or "year"}, or None."""
     text = text or ""
