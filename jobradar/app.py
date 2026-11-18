@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field, field_validator
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from . import config as config_mod
-from . import discover, gemini, i18n, levels, link, message, profile, salary, scoring, skills
+from . import bliss, discover, gemini, i18n, levels, link, message, profile, salary, scoring, skills
 from .i18n import t
 from .db import STATUSES, Database
 from .filters import reason_label
@@ -115,6 +115,22 @@ class FilterBody(BaseModel):
         if not value or any(c in value for c in "\r\n"):
             raise ValueError(t("entrada inválida"))
         return value
+
+
+class BlissMessage(BaseModel):
+    role: Literal["user", "bliss"]
+    text: str = Field(min_length=1, max_length=4000)
+
+
+class BlissBody(BaseModel):
+    """The conversation so far (the app sends the last ones) and, if any, the job it is about."""
+
+    messages: list[BlissMessage] = Field(min_length=1, max_length=20)
+    job: str | None = None
+
+
+class VoiceBody(BaseModel):
+    text: str = Field(min_length=1, max_length=1500)
 
 
 class AiBody(BaseModel):
@@ -467,6 +483,30 @@ def create_app(
     @app.post("/api/jobs/{uid:path}/cv")
     def job_cv(uid: str):
         return ai_text(uid, message.tailor)
+
+    @app.post("/api/bliss")
+    def bliss_reply(body: BlissBody):
+        """Bliss's answer: its text, the jobs it shows (whole, as in /api/jobs) and at most one proposed action."""
+        answer = with_ai(lambda cfg: bliss.reply([m.model_dump() for m in body.messages], db, cfg, llm_client,
+                                                 body.job, config_sources()))
+        jobs = {j["uid"]: j for j in db.all_jobs()}
+        shown = [jobs[uid] for uid in answer["jobs"] if uid in jobs]
+        for job in shown:
+            job["salary"] = _salary(job)
+        return {**answer, "jobs": shown}
+
+    @app.post("/api/bliss/voice")
+    def bliss_voice(body: VoiceBody):
+        """One of Bliss's answers read aloud (a WAV). Always Gemini's voice: it needs GEMINI_API_KEY."""
+        if not os.environ.get("GEMINI_API_KEY"):
+            raise HTTPException(400, t("Falta {key} no .env (cria a chave em {where}).", key="GEMINI_API_KEY",
+                                       where="aistudio.google.com"))
+        try:
+            audio = gemini.speak(body.text)
+        except gemini.GeminiError as exc:
+            # the voice's own free quota is small: say so as a 429, so the app can say "in a minute"
+            raise HTTPException(429 if exc.status == 429 else 502, str(exc)) from exc
+        return Response(content=audio, media_type="audio/wav")
 
     @app.patch("/api/jobs/{uid:path}")
     def update_job(uid: str, body: JobUpdate):
