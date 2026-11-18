@@ -8,8 +8,10 @@ logs or error messages. Plain httpx, which the project already uses: no extra SD
 from __future__ import annotations
 
 import base64
+import io
 import os
 import re
+import wave
 
 import httpx
 
@@ -84,6 +86,47 @@ def generate(prompt: str, model: str, system: str = "", max_tokens: int = 8192,
     if not text:
         raise GeminiError(t("O Gemini não devolveu texto ({reason}).", reason=candidates[0].get("finishReason", "?")))
     return text
+
+
+def speak(text: str, voice: str = "Charon", model: str = "gemini-3.8-flash-lite-tts",
+          client: httpx.Client | None = None, api_key: str | None = None) -> bytes:
+    """The text read aloud by one of Gemini's voices (Charon: a man's), as a WAV.
+    Only the text goes: the speech models read instructions aloud and refuse a systemInstruction."""
+    body = {"contents": [{"parts": [{"text": text}]}],
+            "generationConfig": {"responseModalities": ["AUDIO"],
+                                 "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": voice}}}}}
+    own = client is None
+    client = client or httpx.Client(timeout=httpx.Timeout(60.0, connect=10.0))
+    try:
+        resp = client.post(API.format(model=model), json=body,
+                           headers={"x-goog-api-key": api_key or os.environ.get("GEMINI_API_KEY", "")})
+    except httpx.TimeoutException as exc:
+        raise GeminiError(t("O Gemini demorou demasiado a responder. Tenta outra vez.")) from exc
+    except httpx.HTTPError as exc:
+        raise GeminiError(t("Sem ligação à API do Gemini.")) from exc
+    finally:
+        if own:
+            client.close()
+    if resp.is_error:
+        raise _fail(resp)
+
+    candidates = resp.json().get("candidates") or [{}]
+    parts = (candidates[0].get("content") or {}).get("parts") or []
+    audio = next((p["inlineData"] for p in parts if "inlineData" in p), None)
+    if audio is None:
+        raise GeminiError(t("O Gemini não devolveu texto ({reason}).", reason=candidates[0].get("finishReason", "?")))
+    data = base64.b64decode(audio["data"])
+    if data.startswith(b"RIFF"):  # already a WAV
+        return data
+    # raw 16-bit mono PCM ("audio/L16;codec=pcm;rate=24000"): give it a WAV header
+    rate = re.search(r"rate=(\d+)", audio.get("mimeType", ""))
+    out = io.BytesIO()
+    with wave.open(out, "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(int(rate.group(1)) if rate else 24000)
+        w.writeframes(data)
+    return out.getvalue()
 
 
 def list_models(client: httpx.Client | None = None, api_key: str | None = None) -> list[str]:
