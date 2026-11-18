@@ -107,7 +107,7 @@ def test_snapshot_job_description_is_cut(tmp_path, cfg):
 
 
 def test_about_has_the_public_facts_only():
-    for fact in ("Flávio Silva", "Universidade do Minho", "github.com/FuzzyLaDuzzy", "fuzzyladuzzy.github.io",
+    for fact in ("Flávio Silva", "Universidade do Minho", "github.com/FuzzyLaDuzzy", "fuzzyladuzzy.github.io/porfolio",
                  "linkedin.com/in/flávio-alex-silva"):
         assert fact in bliss.ABOUT
     assert "@" not in bliss.ABOUT and "Jscrambler" not in bliss.ABOUT
@@ -352,3 +352,9 @@ def test_system_only_asks_for_a_language_when_the_person_does():
     # with "language" in the example, the light model filled it from the chat and the letter left the posting's language
     assert '"language": "pt|en"' not in bliss.SYSTEM
     assert 'junta "language": "pt" ou "en" só se a pessoa pedir uma língua' in bliss.SYSTEM
+
+
+def test_the_portfolio_link_is_the_one_that_opens():
+    # GitHub Pages serves the portfolio at /porfolio: the bare address answers 404
+    assert 'href="https://fuzzyladuzzy.github.io/porfolio/"' in INDEX
+    assert 'href="https://fuzzyladuzzy.github.io"' not in INDEX

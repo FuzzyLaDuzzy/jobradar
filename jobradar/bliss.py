@@ -25,7 +25,7 @@ o 👤 Perfil (lido do CV) e funciona em português e em inglês.
 
 Foi criado por Flávio Silva, que fez o mestrado (MSc) em Engenharia Informática na Universidade do Minho,
 com uma tese sobre qualidade de dados. Também criou o dqvouch (github.com/FuzzyLaDuzzy/dqvouch), uma
-ferramenta livre que propõe testes de qualidade de dados. Portefólio: fuzzyladuzzy.github.io.
+ferramenta livre que propõe testes de qualidade de dados. Portefólio: fuzzyladuzzy.github.io/porfolio.
 LinkedIn: linkedin.com/in/flávio-alex-silva. GitHub: github.com/FuzzyLaDuzzy."""
 
 MAX_DESCRIPTION = 6000
