@@ -157,12 +157,14 @@ WRITE_IN = {"pt": "Escreve a mensagem toda em português europeu: assunto, sauda
             "en": "Write the whole message in English: subject, greeting, body and sign-off."}
 
 
-def _in_language(system: str, ask: str, language: str | None) -> tuple[str, str]:
-    """language: "pt" or "en" to choose it (the draft's button); by default, the posting's language."""
-    if language in WRITE_IN:  # the rule is replaced: a second, contradicting one could lose
+def _in_language(system: str, ask: str, language: str | None, write_in: dict | None = None) -> tuple[str, str]:
+    """language: "pt" or "en" to choose it (the draft's button); by default, the posting's language.
+    write_in: what is asked again at the end (WRITE_IN; a letter has its own, with no subject line)."""
+    write_in = write_in or WRITE_IN
+    if language in write_in:  # the rule is replaced: a second, contradicting one could lose
         name = INTERVIEW_LANGUAGES[language][0]
         system = system.replace(POSTING_LANGUAGE, f"- Escreve em {name}, seja qual for a língua do anúncio.")
-        ask += "\n" + WRITE_IN[language]
+        ask += "\n" + write_in[language]
     return system, ask
 
 
@@ -170,6 +172,30 @@ def write(job: dict, cfg: dict, client=None, language: str | None = None) -> str
     system, ask = _in_language(SYSTEM, "Escreve a mensagem de candidatura para esta vaga.", language)
     prompt = _prompt(job, cfg.get("profile") or {}, ask, cfg.get("search"))
     return _generate(system, prompt, cfg, client)
+
+
+LETTER_SYSTEM = """Escreves a carta de apresentação que um candidato junta à candidatura a uma vaga.
+
+Regras:
+""" + POSTING_LANGUAGE + """
+- Forma de carta, sem assunto: saudação, 3 ou 4 parágrafos (cerca de 250 a 350 palavras no corpo), despedida e assinatura. Os parágrafos dizem porquê esta empresa e esta vaga, o que o candidato traz (com factos do perfil) e o fecho, com vontade de conversar.
+- Usa só factos do perfil do candidato. Nunca inventes experiência, anos, certificações, tecnologias ou níveis de língua.
+- Liga o perfil ao que o anúncio pede e escolhe só o que for relevante para esta vaga.
+- Se o anúncio pedir algo que o perfil não tem (anos de experiência, uma tecnologia), não o escondas nem finjas: diz numa frase que ainda não tens e mostra vontade de crescer nisso.
+- Termina com a assinatura do perfil, tal como está; o que estiver entre parênteses retos fica para o candidato preencher.
+- Responde só com a carta, em texto simples e sem markdown.
+
+""" + DATA_RULE
+# asked again at the end, like WRITE_IN, but a letter has no subject line
+LETTER_WRITE_IN = {"pt": "Escreve a carta toda em português europeu: saudação, corpo e despedida.",
+                   "en": "Write the whole letter in English: greeting, body and sign-off."}
+
+
+def cover_letter(job: dict, cfg: dict, client=None, language: str | None = None) -> str:
+    """A formal cover letter for the job (Bliss writes it in the chat); the language works as in the message."""
+    system, ask = _in_language(LETTER_SYSTEM, "Escreve a carta de apresentação para esta vaga.", language,
+                               LETTER_WRITE_IN)
+    return _generate(system, _prompt(job, cfg.get("profile") or {}, ask, cfg.get("search")), cfg, client)
 
 
 FOLLOW_UP_SYSTEM = """Escreves um email curto de seguimento (follow-up) para uma candidatura que ainda não teve resposta.

@@ -471,6 +471,11 @@ def create_app(
         """language: the draft's "Rewrite in…" button; by default the message follows the posting."""
         return ai_text(uid, lambda job, cfg, client: message.write(job, cfg, client, language))
 
+    @app.post("/api/jobs/{uid:path}/letter")
+    def job_letter(uid: str, language: Literal["pt", "en"] | None = None):
+        """A cover letter (Bliss writes it in the chat); the language works as in the message."""
+        return ai_text(uid, lambda job, cfg, client: message.cover_letter(job, cfg, client, language))
+
     @app.post("/api/jobs/{uid:path}/followup")
     def job_follow_up(uid: str, language: Literal["pt", "en"] | None = None):
         """The follow-up email for an application with no reply yet; the language works as in the message."""
