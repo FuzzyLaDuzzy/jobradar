@@ -102,6 +102,25 @@ def snapshot(db: Database, cfg: dict, question: str, job_uid: str | None = None,
 
 
 ACTIONS = ("status", "search", "refresh", "message")
+# asked again at the very end, in that language (as message.WRITE_IN): with Portuguese rules and data around it,
+# the light model sometimes answered an English question in Portuguese, and an "unless…" clause was ignored
+ANSWER_IN = {"en": 'Write the "text" of your answer in English.',
+             "pt": 'Escreve o "text" da resposta em português europeu.'}
+_PT_WORDS = {"que", "não", "nao", "quero", "vaga", "vagas", "tenho", "porque", "devo", "uma", "para", "como", "onde",
+             "qual", "quais", "estou", "posso", "fazer", "trabalho", "emprego", "olá", "ola", "obrigado", "sim", "meu",
+             "minha", "os", "da", "dos", "das", "no", "na", "com", "mais", "isto", "esta", "este", "procura"}
+_EN_WORDS = {"the", "which", "what", "why", "how", "should", "i", "my", "me", "job", "jobs", "want", "find", "can",
+             "you", "is", "are", "does", "first", "few", "new", "where", "please", "thanks", "hi", "hello", "of",
+             "for", "with", "this", "these", "look", "search", "work"}
+
+
+def _language_of(text: str, default: str) -> str:
+    """"pt" or "en", from accents and common words; `default` (the app's) when it can't tell."""
+    low = text.lower()
+    words = re.findall(r"[a-zà-ÿ]+", low)
+    pt = sum(w in _PT_WORDS for w in words) + 2 * bool(re.search(r"[ãõçáéíóúâêôà]", low))
+    en = sum(w in _EN_WORDS for w in words)
+    return "pt" if pt > en else "en" if en > pt else default
 HISTORY = 10  # the last messages that go to the AI
 
 SYSTEM = """És o Bliss, o assistente do JobRadar, criado por Flávio Silva. Falas de ti no masculino
@@ -195,7 +214,7 @@ def reply(messages: list[dict], db: Database, cfg: dict, client=None, job_uid: s
     talk = "\n".join(f"{'Pessoa' if m['role'] == 'user' else 'Bliss'}: {m['text']}" for m in last)
     question = next((m["text"] for m in reversed(last) if m["role"] == "user"), "")
     prompt = (f"<sobre>\n{ABOUT}\n</sobre>\n\n{snapshot(db, cfg, question, job_uid, sources)}\n\n"
-              f"<conversa>\n{_inert(talk)}\n</conversa>")
+              f"<conversa>\n{_inert(talk)}\n</conversa>\n\n{ANSWER_IN[_language_of(question, i18n.language)]}")
     system = SYSTEM.format(language="inglês" if i18n.language == "en" else "português europeu",
                            statuses=", ".join(STATUSES), levels=", ".join(levels.LEVELS))
     return parse(message._generate(system, prompt, cfg, client), {j["uid"] for j in db.all_jobs()})

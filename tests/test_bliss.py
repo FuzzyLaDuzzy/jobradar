@@ -302,3 +302,23 @@ def test_parse_search_with_only_level_words_as_area_drops_them():
 ])
 def test_parse_finds_the_json_around_other_text(reply):
     assert bliss.parse(reply, KNOWN)["text"] == "Olá"
+
+
+@pytest.mark.parametrize("app, question, answer_in", [
+    ("en", "Which jobs should I look at first?", "en"),
+    ("pt", "Which jobs should I look at first?", "en"),  # the question's language wins over the app's
+    ("en", "Que vagas devo ver primeiro?", "pt"),
+    ("pt", "Porque é que tenho poucas vagas novas?", "pt"),
+    ("en", "Python?", "en"),  # can't tell: the app's language
+    ("pt", "Python?", "pt"),
+])
+def test_reply_asks_for_the_language_again_at_the_end(tmp_path, cfg, make_client, app, question, answer_in):
+    # with Portuguese rules and data around it, the light model sometimes answered an English question in Portuguese
+    from jobradar import i18n
+    i18n.language = app
+    seen = []
+    answer = {"candidates": [{"content": {"parts": [{"text": '{"text": "ok", "jobs": [], "action": null}'}]}}]}
+    client = make_client(lambda r: seen.append(json.loads(r.content)) or httpx.Response(200, json=answer))
+    bliss.reply([{"role": "user", "text": question}], Database(tmp_path / "t.db"), cfg, client)
+    assert seen[0]["contents"][0]["parts"][0]["text"].endswith(bliss.ANSWER_IN[answer_in])
+    assert bliss.ANSWER_IN["en"] == 'Write the "text" of your answer in English.'
