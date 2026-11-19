@@ -93,6 +93,7 @@ LinkedIn, Indeed and Glassdoor are left out on purpose (see [Limitations](#limit
 - **Adds a job from its link**: paste it in **+ Add job** and **Read from link** fills in the title, company, place, date and description (not LinkedIn, Indeed or Glassdoor).
 - **Exports to CSV** (⬇): your applications, saved and discarded jobs and notes, in a sheet for Excel.
 - **Spots jobs that closed**: when a job disappears from its source, it's marked as no longer published.
+- **Watches careers pages**: for companies with no job platform the app can read, ☰ Menu → 👁 **Watched pages** takes a name and the page's address. Every search reads those pages again and keeps their text; when a new line has one of your area or level words ("Junior Backend Developer"), the page is marked as changed, Bliss mentions it and the Windows notification counts it. A new date or testimonial is recorded without a warning. Pages that the site's `robots.txt` forbids, or that need JavaScript to show their text, can't be watched, and the window says why.
 - **Português or English**: ☰ Menu → 🌐 changes the whole app, the error messages and what the AI writes for you.
 - **Light or dark**: ☰ Menu → ☾/☀ (until you choose, it follows your system).
 - **Bliss, the assistant**: the button in the corner opens a chat beside the list (the whole screen on a phone). Ask about your search and the app ("why do I have so few new jobs?", "which jobs should I look at first?"), or say what you're after ("I want a software engineer job in Braga"): Bliss shows the jobs you already have that fit and proposes changing the search. Nothing changes until you press **Confirm**, whether it's a job's status, the search or a new search. Ask for a cover letter, an application message, a follow-up email, interview prep or CV adjustments and Bliss writes it in the chat, with **Copy** and **Another version**. When you open it, it sums up what changed since last time: new jobs, and applications that just reached 7 days with no reply. 🔊 reads an answer aloud with Gemini's voice, and Bliss moves its mouth while it talks. Bliss answers from a summary of your data (your profile, the jobs, the sources and what was cut, never your notes or contact details) and the conversation stays on your device. It needs the Gemini key, or the Claude key to write and the Gemini key for the voice.
@@ -291,6 +292,7 @@ jobradar/
   i18n.py           Português / English
   refresh.py        runs every source, filters, scores and stores; one failing source doesn't stop the rest
   discover.py       finds the careers sites of companies in your area
+  watch.py          watched careers pages: their visible lines, the new ones, and whether they have your words
   db.py             SQLite: jobs, status, notes, history
   app.py            FastAPI
   static/           the interface (Vue 3, no build step)

@@ -17,6 +17,8 @@ EN = {
     "a página precisa de JavaScript: não dá para vigiar": "the page needs JavaScript: it can't be watched",
     "Não foi possível abrir a página ({error}).": "Couldn't open the page ({error}).",
     "Esta página não está a ser vigiada.": "This page isn't being watched.",
+    "1 página de carreiras mudou": "1 careers page changed",
+    "{n} páginas de carreiras mudaram": "{n} careers pages changed",
     # config.py
     "YAML inválido: {error}": "Invalid YAML: {error}",
     "A configuração tem de ser um mapa YAML.": "The configuration must be a YAML map.",

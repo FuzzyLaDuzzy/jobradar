@@ -62,6 +62,33 @@ def test_no_notification_without_new_jobs(monkeypatch):
     assert calls == []
 
 
+def test_changed_careers_pages_join_the_notification(monkeypatch):
+    calls = capture(monkeypatch)
+    notify.show([{"title": "Java Dev", "company": "Uphold"}], "http://127.0.0.1:8000", ["F3M"])
+    texts = [t.text for t in ET.fromstring(calls[0][1]).iter("text")]
+    assert texts == ["JobRadar: 1 vaga nova · 1 página de carreiras mudou", "Java Dev · Uphold"]
+
+
+def test_only_pages_changed_still_notifies_with_their_names(monkeypatch):
+    calls = capture(monkeypatch)
+    notify.show([], "http://127.0.0.1:8000", ["F3M", "Growin"])
+    texts = [t.text for t in ET.fromstring(calls[0][1]).iter("text")]
+    assert texts == ["JobRadar: 2 páginas de carreiras mudaram", "F3M, Growin"]
+
+
+def test_pages_changed_since_a_search_started(tmp_path):
+    db = Database(tmp_path / "t.db")
+    for name in ("F3M", "Growin", "KCS iT"):
+        db.add_watched(name, f"https://{name[:3].lower()}.pt/")
+    db.save_page("https://f3m.pt/", checked_at="2026-11-19T09:01:00+00:00", changed_at="2026-11-19T09:01:00+00:00",
+                 relevant=True)
+    db.save_page("https://gro.pt/", checked_at="2026-11-19T09:01:00+00:00", changed_at="2026-11-19T09:01:00+00:00",
+                 relevant=False)  # changed, without the person's words
+    db.save_page("https://kcs.pt/", checked_at="2026-11-19T09:01:00+00:00", changed_at="2026-11-18T21:00:00+00:00",
+                 relevant=True)  # an earlier search
+    assert db.pages_changed_since("2026-11-19T09:00:00+00:00") == ["F3M"]
+
+
 def test_backup_keeps_the_last_7_days(tmp_path):
     import sqlite3
 

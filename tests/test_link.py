@@ -39,6 +39,16 @@ def test_posting_inside_a_graph():
     assert link.read("https://x.pt/1", client(page(data)))["location"] == "Braga, PT, Remote"
 
 
+def test_asks_for_a_web_page_not_json():
+    # the app's client asks the APIs for JSON; a careers site then answers 406 or 404 (ITSector, Bizneo, 19/11/2026)
+    def handler(request):
+        if "text/html" not in request.headers.get("accept", ""):
+            return httpx.Response(406)
+        return httpx.Response(200, text=page(POSTING))
+    with httpx.Client(transport=httpx.MockTransport(handler), headers={"Accept": "application/json"}) as c:
+        assert link.read("https://x.pt/9", c)["title"] == "Junior Backend Developer"
+
+
 def test_page_without_a_posting_uses_its_title():
     head = '<meta property="og:title" content="Data Engineer · Acme"><meta name="description" content="Join us in Braga">'
     job = link.read("https://x.pt/2", client(page(head=head)))

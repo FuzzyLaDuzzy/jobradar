@@ -376,6 +376,12 @@ class Database:
         return [dict(r, lines=json.loads(r["lines"] or "[]"), added=json.loads(r["added"] or "[]"),
                      relevant=bool(r["relevant"])) for r in rows]
 
+    def pages_changed_since(self, since: str) -> list[str]:
+        """The watched pages with a change that matters at or after `since` (a refresh's start)."""
+        rows = self.conn.execute("SELECT name FROM watched_pages WHERE relevant = 1 AND changed_at >= ? "
+                                 "ORDER BY name COLLATE NOCASE", (since,)).fetchall()
+        return [r["name"] for r in rows]
+
     def add_watched(self, name: str, url: str) -> dict:
         with self._lock:
             self.conn.execute("INSERT OR IGNORE INTO watched_pages (url, name) VALUES (?, ?)", (url, name))

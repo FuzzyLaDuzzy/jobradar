@@ -30,6 +30,22 @@ def test_added_lines_are_the_new_ones_in_page_order():
     assert watch.added_lines(["A", "B"], ["B", "A"]) == []
 
 
+def test_a_new_date_or_count_is_not_a_new_line():
+    # "Data de atualização: 19/11/2026" would change every day, and "data" is one of the person's words
+    assert watch.added_lines(["Data de atualização: 18/11/2026", "12 vagas abertas"],
+                             ["Data de atualização: 19/11/2026", "13 vagas abertas", "Junior Developer"]) == ["Junior Developer"]
+
+
+def test_only_a_line_like_a_job_title_counts():
+    # the area words are made for job titles: "ti", "data" or "tecnologia" in a sentence is no job
+    words = ["ti", "tecnologia", "developer", "data"]
+    assert watch.is_relevant(["Junior Developer - Braga"], words)
+    assert watch.is_relevant(["Data Engineer (m/f)"], words)
+    assert not watch.is_relevant(["Vem viver a tecnologia connosco e cresce com a nossa equipa todos os dias, em Braga."], words)
+    assert not watch.is_relevant(["Licenciatura em TI ou áreas similares;"], words)
+    assert not watch.is_relevant(["O nosso blog: tudo sobre tecnologia, inovação, pessoas, eventos e a vida na empresa"], words)
+
+
 def test_relevance_needs_one_of_the_persons_words():
     words = watch.watch_words({"search": {"title_keywords": ["backend", "software"], "levels": ["junior"]}})
     assert "backend" in words and "junior" in words

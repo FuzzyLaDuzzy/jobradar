@@ -94,7 +94,7 @@ def main() -> None:
             if run.get("message"):
                 line += f"  ({run['message']})"
             print(line)
-        notify.show(db.new_since(started), f"http://{args.host}:{args.port}")
+        notify.show(db.new_since(started), f"http://{args.host}:{args.port}", db.pages_changed_since(started))
         return
 
     if args.command in ("discover", "descobrir"):

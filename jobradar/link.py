@@ -133,7 +133,9 @@ def _fetch(url: str, client: httpx.Client) -> tuple[str, str]:
         # to the checked address, with the site's name where the server and TLS (certificate, SNI) expect it
         name = host + (f":{parts.port}" if parts.port else "")
         target = parts._replace(netloc=(f"[{ip}]" if ":" in ip else ip) + (f":{parts.port}" if parts.port else ""))
-        with client.stream("GET", target.geturl(), headers={"Host": name}, extensions={"sni_hostname": host},
+        # a web page, whatever the client asks the APIs for (JSON): careers sites answer that with 406 or 404
+        with client.stream("GET", target.geturl(), extensions={"sni_hostname": host},
+                           headers={"Host": name, "Accept": "text/html,application/xhtml+xml,*/*;q=0.8"},
                            follow_redirects=False) as resp:
             if resp.is_redirect:
                 url = urljoin(url, resp.headers.get("location", ""))

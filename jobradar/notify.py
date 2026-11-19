@@ -40,10 +40,16 @@ def _line(job: dict) -> str:
     return f"{job['title']} · {job['company']}" if job.get("company") else job["title"]
 
 
-def toast_xml(jobs: list[dict], url: str) -> str:
-    """Title plus the two best jobs: a toast shows at most three lines of text."""
-    head = t("1 vaga nova") if len(jobs) == 1 else t("{n} vagas novas", n=len(jobs))
-    lines = [f"JobRadar: {head}"] + [_line(j) for j in jobs[:2]]
+def toast_xml(jobs: list[dict], url: str, pages: list[str] = ()) -> str:
+    """Title plus the two best jobs: a toast shows at most three lines of text. Careers pages that changed
+    (watch.py) join the title; with no new jobs, their names take the jobs' place."""
+    heads = []
+    if jobs:
+        heads.append(t("1 vaga nova") if len(jobs) == 1 else t("{n} vagas novas", n=len(jobs)))
+    if pages:
+        heads.append(t("1 página de carreiras mudou") if len(pages) == 1
+                     else t("{n} páginas de carreiras mudaram", n=len(pages)))
+    lines = [f"JobRadar: {' · '.join(heads)}"] + ([_line(j) for j in jobs[:2]] if jobs else [", ".join(pages)])
     if len(jobs) > 2:
         lines[-1] += t(" (e mais {n})", n=len(jobs) - 2)
     texts = "".join(f"<text>{escape(line)}</text>" for line in lines)
@@ -58,14 +64,14 @@ def register() -> None:
         winreg.SetValueEx(key, "IconUri", 0, winreg.REG_SZ, str(ICON))
 
 
-def show(jobs: list[dict], url: str) -> None:
-    if not jobs or sys.platform != "win32":
+def show(jobs: list[dict], url: str, pages: list[str] = ()) -> None:
+    if not (jobs or pages) or sys.platform != "win32":
         return
     try:
         register()
         subprocess.run(
             ["powershell", "-NoProfile", "-NonInteractive", "-Command", SCRIPT],
-            env={**os.environ, "JOBRADAR_TOAST": toast_xml(jobs, url)},
+            env={**os.environ, "JOBRADAR_TOAST": toast_xml(jobs, url, pages)},
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0), timeout=30, check=False,
         )
     except (OSError, subprocess.SubprocessError) as exc:  # a missing toast must never break a refresh
