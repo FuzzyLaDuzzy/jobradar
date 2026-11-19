@@ -120,6 +120,17 @@ CREATE TABLE IF NOT EXISTS cut (
     reason TEXT,
     seen TEXT
 );
+-- careers pages of companies without a job platform (watch.py): their last text and their last change
+CREATE TABLE IF NOT EXISTS watched_pages (
+    url TEXT PRIMARY KEY,
+    name TEXT,
+    lines TEXT,
+    checked_at TEXT,
+    changed_at TEXT,
+    added TEXT,
+    relevant INTEGER DEFAULT 0,
+    error TEXT DEFAULT ''
+);
 CREATE TABLE IF NOT EXISTS runs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     source TEXT,
@@ -356,6 +367,37 @@ class Database:
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 [(job.uid, source, job.company, job.title, job.location, web_link(job.url), job.posted_at, reason, now)
                  for job, reason in cut])
+            self.conn.commit()
+
+    # --- watched pages --------------------------------------------------------------------------------------
+
+    def watched_pages(self) -> list[dict]:
+        rows = self.conn.execute("SELECT * FROM watched_pages ORDER BY name COLLATE NOCASE").fetchall()
+        return [dict(r, lines=json.loads(r["lines"] or "[]"), added=json.loads(r["added"] or "[]"),
+                     relevant=bool(r["relevant"])) for r in rows]
+
+    def add_watched(self, name: str, url: str) -> dict:
+        with self._lock:
+            self.conn.execute("INSERT OR IGNORE INTO watched_pages (url, name) VALUES (?, ?)", (url, name))
+            self.conn.commit()
+        return next(p for p in self.watched_pages() if p["url"] == url)
+
+    def remove_watched(self, url: str) -> bool:
+        with self._lock:
+            gone = self.conn.execute("DELETE FROM watched_pages WHERE url = ?", (url,)).rowcount
+            self.conn.commit()
+        return bool(gone)
+
+    def save_page(self, url: str, *, checked_at: str, error: str = "", lines: list[str] | None = None,
+                  added: list[str] | None = None, relevant: bool | None = None, changed_at: str | None = None) -> None:
+        """Only the fields given change; error="" clears the last error."""
+        fields = {"checked_at": checked_at, "error": error, "changed_at": changed_at, "relevant": relevant,
+                  "lines": None if lines is None else json.dumps(lines, ensure_ascii=False),
+                  "added": None if added is None else json.dumps(added, ensure_ascii=False)}
+        fields = {k: (int(v) if isinstance(v, bool) else v) for k, v in fields.items() if v is not None}
+        with self._lock:
+            self.conn.execute(f"UPDATE watched_pages SET {', '.join(f'{k} = ?' for k in fields)} WHERE url = ?",
+                              [*fields.values(), url])
             self.conn.commit()
 
     def cut_jobs(self) -> list[dict]:

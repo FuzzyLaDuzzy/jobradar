@@ -10,7 +10,7 @@ from typing import Callable
 
 import httpx
 
-from . import scoring
+from . import scoring, watch
 from .db import Database
 from .filters import evaluate, quick_reject
 from .models import Job
@@ -118,6 +118,10 @@ def run_refresh(
             summary["finished_at"] = finished
             db.add_run(**summary)
             summaries.append(summary)
+        try:  # the careers pages being watched (watch.py), with the same client, before it closes
+            watch.check_pages(db, cfg, client, _now())
+        except Exception:  # never let them break a search
+            log.exception("Falhou a leitura das páginas vigiadas")
     finally:
         if own_client:
             client.close()
