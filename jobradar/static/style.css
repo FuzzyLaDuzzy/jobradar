@@ -117,6 +117,20 @@ body {
 .sources-line:hover { color: var(--text); }
 .sources-line b { color: var(--accent); }
 .sources-line .failing { color: var(--warn); font-weight: 600; }
+.sources-row { display: flex; flex-wrap: wrap; align-items: center; column-gap: 6px; }
+/* watched pages */
+.page-list { list-style: none; margin: 0; padding: 0; }
+.page-list > li { padding: 10px 2px; border-bottom: 1px solid var(--border); font-size: 13.5px; }
+.page-head { display: flex; align-items: center; gap: 8px; }
+.page-head a { color: var(--text); text-decoration: none; }
+.page-head a:hover { text-decoration: underline; }
+.page-head .btn { margin-left: auto; }
+.page-list .hot .page-head .muted { color: var(--accent); font-weight: 600; }
+.page-lines { margin: 6px 0 0; padding-left: 18px; color: var(--muted); }
+.page-lines b { color: var(--text); }
+.page-error { margin: 4px 0 0; }
+.page-add { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.page-add input { flex: 1 1 160px; min-width: 0; }
 .source-list { list-style: none; margin: 0; padding: 0; }
 .source-list li {
   display: flex; align-items: center; gap: 8px; padding: 8px 2px; border-bottom: 1px solid var(--border);

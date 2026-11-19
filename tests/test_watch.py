@@ -1,10 +1,14 @@
 """Watched pages: the careers pages of companies without a job platform, and what changed on them."""
 
+import shutil
+from pathlib import Path
 from types import SimpleNamespace
 
 import httpx
+from fastapi.testclient import TestClient
 
 from jobradar import link, watch
+from jobradar.app import create_app
 from jobradar.db import Database
 from jobradar.refresh import run_refresh
 
@@ -132,3 +136,46 @@ def test_a_broken_page_check_never_stops_the_search(tmp_path, monkeypatch, cfg):
     summaries = run_refresh(cfg, Database(tmp_path / "t.db"), client=SimpleNamespace(),
                             fetchers={"lever": lambda c, e, prefilter=None: []})
     assert summaries  # the sources' results still come back
+
+
+# --- the API -------------------------------------------------------------------------------------------------
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def app_client(tmp_path):
+    shutil.copy(ROOT / "config.example.yaml", tmp_path / "config.yaml")
+    return TestClient(create_app(config_path=tmp_path / "config.yaml", db_path=tmp_path / "t.db"))
+
+
+def test_pages_api_adds_lists_and_removes(tmp_path, monkeypatch):
+    monkeypatch.setattr(link, "_resolve", lambda host: "93.184.216.34")
+    tc = app_client(tmp_path)
+    added = tc.post("/api/pages", json={"name": "F3M", "url": "https://recrutamento.f3m.pt/"})
+    assert added.status_code == 200 and added.json()["name"] == "F3M"
+    [page] = tc.get("/api/pages").json()
+    assert page["name"] == "F3M" and "lines" not in page and page["hits"] == []
+    assert tc.delete("/api/pages", params={"url": "https://recrutamento.f3m.pt/"}).status_code == 200
+    assert tc.get("/api/pages").json() == []
+    assert tc.delete("/api/pages", params={"url": "https://recrutamento.f3m.pt/"}).status_code == 404
+
+
+def test_pages_api_refuses_local_and_non_web_addresses(tmp_path, monkeypatch):
+    monkeypatch.setattr(link, "_resolve", lambda host: None if host in ("localhost", "192.168.1.1") else "93.184.216.34")
+    tc = app_client(tmp_path)
+    for bad in ("http://localhost/x", "http://192.168.1.1/", "file:///etc/passwd", "ftp://x.pt/", "x.pt/careers",
+                "https://www.linkedin.com/company/x/jobs"):
+        assert tc.post("/api/pages", json={"name": "X", "url": bad}).status_code == 400, bad
+    assert tc.post("/api/pages", json={"name": "", "url": "https://x.pt/"}).status_code == 422
+    assert tc.get("/api/pages").json() == []
+
+
+def test_pages_api_marks_the_new_lines_with_the_persons_words(tmp_path, monkeypatch):
+    monkeypatch.setattr(link, "_resolve", lambda host: "93.184.216.34")
+    tc = app_client(tmp_path)
+    tc.post("/api/pages", json={"name": "F3M", "url": "https://recrutamento.f3m.pt/"})
+    db = Database(tmp_path / "t.db")
+    db.save_page("https://recrutamento.f3m.pt/", checked_at="2026-11-18T21:00", changed_at="2026-11-18T21:00",
+                 lines=["a"], added=["Junior Backend Developer", "Atualizado a 18/11"], relevant=True)
+    [page] = tc.get("/api/pages").json()
+    assert page["hits"] == ["Junior Backend Developer"] and page["relevant"]

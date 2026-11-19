@@ -44,6 +44,7 @@
           <button @click="openMarket">📊 {{ t('Mercado') }}</button>
           <button @click="openProfile()">👤 {{ t('Perfil') }}</button>
           <button @click="openAddJob">{{ t('+ Adicionar vaga por link') }}</button>
+          <button @click="openPages">👁 {{ t('Páginas vigiadas') }}</button>
           <a href="/api/export.csv" :title="t('As tuas candidaturas, guardadas, descartadas e notas, numa folha para o Excel')">{{ t('⬇ Exportar CSV') }}</a>
           <hr>
           <button @click="changeLanguage(lang === 'pt' ? 'en' : 'pt')">🌐 {{ lang === 'pt' ? 'English' : 'Português' }}</button>
@@ -61,6 +62,7 @@
   </div>
 
   <!-- the sources in one line: the list, sorted, in its own window -->
+  <div class="sources-row">
   <button class="sources-line" v-if="runs.length || scoringNow" @click="sourcesOpen = true">
     <span v-if="scoringNow"><span class="spinner"></span> {{ t('A IA está a avaliar as vagas novas…') }}</span>
     <span v-else-if="lastRefresh">{{ t('Atualizado {when}', { when: relative(lastRefresh) }) }}</span>
@@ -68,6 +70,12 @@
     <span class="failing" v-if="failingSources.size">· ⚠ {{ t('{n} com problemas', { n: failingSources.size }) }}</span>
     <span aria-hidden="true">▸</span>
   </button>
+  <!-- careers pages of companies without a job platform: their own window -->
+  <button class="sources-line" v-if="pages.length" @click="openPages">
+    <span>· {{ pages.length === 1 ? t('1 página vigiada') : t('{n} páginas vigiadas', { n: pages.length }) }}<b v-if="pagesChanged">{{ pagesChanged === 1 ? t(' · 1 mudou') : t(' · {n} mudaram', { n: pagesChanged }) }}</b></span>
+    <span aria-hidden="true">▸</span>
+  </button>
+  </div>
 
   <nav class="tabs" :aria-label="t('Estado das vagas')">
     <button v-for="tb in tabs" :key="tb.key" :class="{ active: tab === tb.key }" @click="tab = tb.key">
@@ -335,6 +343,35 @@
           </li>
         </ul>
       </details>
+    </div>
+  </div>
+
+  <div class="modal" v-if="pagesOpen" @click.self="pagesOpen = false">
+    <div class="sheet form" role="dialog" :aria-label="t('Páginas vigiadas')">
+      <header>
+        <h2>{{ t('Páginas vigiadas') }}</h2>
+        <button type="button" class="btn icon" @click="pagesOpen = false" :aria-label="t('Fechar')">✕</button>
+      </header>
+      <p class="muted small">{{ t('Páginas de carreiras de empresas sem plataforma de vagas. Em cada procura, a app lê-as de novo e avisa quando aparece uma linha com as tuas palavras de área ou de nível.') }}</p>
+      <ul class="page-list" v-if="pages.length">
+        <li v-for="p in sortedPages" :key="p.url" :class="{ hot: p.relevant && p.changed_at && !p.error }">
+          <div class="page-head">
+            <a :href="p.url" target="_blank" rel="noopener"><strong>{{ p.name }}</strong></a>
+            <span class="muted small">{{ pageState(p) }}</span>
+            <button type="button" class="btn icon" @click="unwatchPage(p)" :aria-label="t('Deixar de vigiar')" :title="t('Deixar de vigiar')">✕</button>
+          </div>
+          <p class="muted small page-error" v-if="p.error">{{ p.error }}</p>
+          <ul class="page-lines" v-else-if="p.changed_at && p.added.length">
+            <li v-for="line in pageLines(p)" :key="line"><b v-if="p.hits.includes(line)">{{ line }}</b><template v-else>{{ line }}</template></li>
+          </ul>
+        </li>
+      </ul>
+      <p class="muted" v-else>{{ t('Ainda não vigias nenhuma página.') }}</p>
+      <form class="page-add" @submit.prevent="watchPage">
+        <input v-model.trim="pageForm.name" :placeholder="t('Empresa')" :aria-label="t('Empresa')" maxlength="80" required>
+        <input v-model.trim="pageForm.url" type="url" placeholder="https://…" :aria-label="t('Endereço da página')" maxlength="2000" required>
+        <button class="btn primary" :disabled="pageForm.busy">＋ {{ t('Vigiar página') }}</button>
+      </form>
     </div>
   </div>
 

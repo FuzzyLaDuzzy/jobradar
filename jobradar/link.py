@@ -108,19 +108,28 @@ def _resolve(host: str) -> str | None:
     return ips[0] if ips and all(ipaddress.ip_address(ip).is_global for ip in ips) else None
 
 
+def _address(url: str) -> str:
+    """The checked address to connect to for `url`: a web link (http/https), not a site that forbids programs,
+    not this computer or the home network."""
+    parts = urlsplit(url)
+    host = (parts.hostname or "").lower()
+    if parts.scheme not in ("http", "https") or not host:
+        raise LinkError(t("o link tem de começar por http:// ou https://"))
+    if any(name in host for name in BLOCKED):
+        raise LinkError(t("Este site não deixa ler as vagas por programas: preenche os campos à mão."))
+    ip = _resolve(host)
+    if ip is None:
+        raise LinkError(t("Este link aponta para um endereço local ou privado: a app não o abre."))
+    return ip
+
+
 def _fetch(url: str, client: httpx.Client) -> tuple[str, str]:
     """The page and its final address. Redirects are followed one by one so every hop is checked, and the
     reading stops as soon as the page passes MAX_BYTES."""
     for _ in range(MAX_REDIRECTS + 1):
+        ip = _address(url)
         parts = urlsplit(url)
         host = (parts.hostname or "").lower()
-        if parts.scheme not in ("http", "https") or not host:
-            raise LinkError(t("o link tem de começar por http:// ou https://"))
-        if any(name in host for name in BLOCKED):
-            raise LinkError(t("Este site não deixa ler as vagas por programas: preenche os campos à mão."))
-        ip = _resolve(host)
-        if ip is None:
-            raise LinkError(t("Este link aponta para um endereço local ou privado: a app não o abre."))
         # to the checked address, with the site's name where the server and TLS (certificate, SNI) expect it
         name = host + (f":{parts.port}" if parts.port else "")
         target = parts._replace(netloc=(f"[{ip}]" if ":" in ip else ip) + (f":{parts.port}" if parts.port else ""))

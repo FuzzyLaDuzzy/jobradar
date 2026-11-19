@@ -16,6 +16,7 @@ EN = {
     "o robots.txt do site não deixa ler esta página": "the site's robots.txt doesn't allow reading this page",
     "a página precisa de JavaScript: não dá para vigiar": "the page needs JavaScript: it can't be watched",
     "Não foi possível abrir a página ({error}).": "Couldn't open the page ({error}).",
+    "Esta página não está a ser vigiada.": "This page isn't being watched.",
     # config.py
     "YAML inválido: {error}": "Invalid YAML: {error}",
     "A configuração tem de ser um mapa YAML.": "The configuration must be a YAML map.",

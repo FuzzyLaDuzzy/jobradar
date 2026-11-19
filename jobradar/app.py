@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field, field_validator
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from . import config as config_mod
-from . import bliss, discover, gemini, i18n, levels, link, message, profile, salary, scoring, skills
+from . import bliss, discover, gemini, i18n, levels, link, message, profile, salary, scoring, skills, watch
 from .i18n import t
 from .db import STATUSES, Database
 from .filters import reason_label
@@ -185,6 +185,11 @@ class ProfileBody(BaseModel):
         return items
 
 
+class PageBody(BaseModel):
+    name: str = Field(min_length=1, max_length=80)
+    url: str = Field(min_length=1, max_length=2000)
+
+
 class CompanyBody(BaseModel):
     company: str = Field(min_length=1, max_length=200)
 
@@ -292,6 +297,34 @@ def create_app(
         for job in jobs:
             job["salary"] = _salary(job)
         return jobs
+
+    @app.get("/api/pages")
+    def watched_pages():
+        """The careers pages being watched (watch.py), without their text. hits: the new lines with your words."""
+        try:
+            words = watch.watch_words(config_mod.load(config_path))
+        except config_mod.ConfigError:
+            words = []
+        pages = db.watched_pages()
+        for page in pages:
+            del page["lines"]
+            page["hits"] = [line for line in page["added"] if watch.is_relevant([line], words)]
+        return pages
+
+    @app.post("/api/pages")
+    def watch_page(body: PageBody):
+        """＋ Watch page: read for the first time at the next search."""
+        try:
+            link._address(body.url.strip())  # a web page on the internet, never this computer or the home network
+        except link.LinkError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        return db.add_watched(body.name.strip(), body.url.strip())
+
+    @app.delete("/api/pages")
+    def unwatch_page(url: str):
+        if not db.remove_watched(url):
+            raise HTTPException(404, t("Esta página não está a ser vigiada."))
+        return {"ok": True}
 
     @app.get("/api/cut")
     def cut_jobs():

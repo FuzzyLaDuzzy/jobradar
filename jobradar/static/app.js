@@ -413,6 +413,26 @@ const EN = {
   "Email de seguimento": "Follow-up email",
   "Preparação da entrevista": "Interview prep",
   "Ajustes ao CV": "CV adjustments",
+  // watched pages
+  "Páginas vigiadas": "Watched pages",
+  "1 página vigiada": "1 watched page",
+  "{n} páginas vigiadas": "{n} watched pages",
+  " · {n} mudaram": " · {n} changed",
+  " · 1 mudou": " · 1 changed",
+  "Páginas de carreiras de empresas sem plataforma de vagas. Em cada procura, a app lê-as de novo e avisa quando aparece uma linha com as tuas palavras de área ou de nível.":
+    "Careers pages of companies without a job platform. At every search, the app reads them again and tells you when a line with your area or level words appears.",
+  "mudou {when}": "changed {when}",
+  "erro na última leitura": "error at the last read",
+  "lida na próxima procura": "read at the next search",
+  "Deixar de vigiar": "Stop watching",
+  "Ainda não vigias nenhuma página.": "You're not watching any page yet.",
+  "Endereço da página": "Page address",
+  "Vigiar página": "Watch page",
+  "A {name} fica vigiada a partir da próxima procura.": "{name} is watched from the next search.",
+  "Não foi possível vigiar a página: {error}": "Couldn't watch the page: {error}",
+  "Não foi possível deixar de vigiar: {error}": "Couldn't stop watching: {error}",
+  "{names} mudou a página de carreiras.": "{names} changed its careers page.",
+  "{names} mudaram a página de carreiras.": "{names} changed their careers pages.",
   "Desde a última vez: 1 vaga nova.": "Since last time: 1 new job.",
   "Desde a última vez: {n} vagas novas.": "Since last time: {n} new jobs.",
   "1 candidatura chegou aos 7 dias sem resposta.": "1 application reached 7 days with no reply.",
@@ -444,6 +464,7 @@ function loadFilters() {
 const BLISS_KEY = "jobradar.bliss"; // the conversation with Bliss: only on this device, the last 50 messages
 const BLISS_KEEP = 50;
 const BLISS_HISTORY = 10; // the last messages that go to the AI
+const PAGES_SEEN_KEY = "jobradar.pagesSeen"; // when the watched pages window was last opened: "· n changed" counts from then
 const BLISS_SEEN_KEY = "jobradar.blissSeen"; // when the panel was last opened here: the summary says what changed since
 const BLISS_GREETING = () => ({ role: "bliss", text: "", local: true, greeting: true }); // written here, no AI call
 
@@ -538,6 +559,10 @@ createApp({
       jobs: [],
       runs: [],
       sourcesOpen: false, // the sources' window
+      pages: [], // the careers pages being watched (/api/pages)
+      pagesOpen: false,
+      pagesSeen: 0,
+      pageForm: { name: "", url: "", busy: false },
       menuOpen: false, // ☰ Menu
       filtersOpen: false, // everything but the search, behind "Filters"
       cut: [], // ✂ what the filters cut in the last search, and why
@@ -606,7 +631,7 @@ createApp({
     // a window is open: Bliss's button steps aside
     anyModal() {
       return this.sourcesOpen || this.settingsOpen || this.addOpen || this.keysOpen || this.follow.open ||
-        this.marketOpen || this.profileOpen || this.triage.open;
+        this.marketOpen || this.profileOpen || this.triage.open || this.pagesOpen;
     },
     blissSuggestions() {
       const area = this.bliss.area && this.bliss.area[0].toUpperCase() + this.bliss.area.slice(1); // "braga" → "Braga"
@@ -694,6 +719,16 @@ createApp({
       return new Set([...this.brokenSources, ...this.runs.filter((r) => r.status === "error").map((r) => r.source)]);
     },
     // the sources' window: the ones with something to say first (problems, then most relevant jobs), the rest folded
+    // watched pages with a change that matters since their window was last opened
+    pagesChanged() {
+      return this.pages.filter((p) => p.relevant && p.changed_at && Date.parse(p.changed_at) > this.pagesSeen).length;
+    },
+    // changes with your words first, then other changes, then no change, then errors
+    sortedPages() {
+      const rank = (p) => (p.error ? 3 : !p.changed_at ? 2 : p.relevant ? 0 : 1);
+      return [...this.pages].sort((a, b) => rank(a) - rank(b) || (b.changed_at || "").localeCompare(a.changed_at || "") ||
+        a.name.localeCompare(b.name));
+    },
     sourceGroups() {
       const quiet = (r) => r.status === "ok" && !r.kept && !this.brokenSources.has(r.source);
       const rank = (r) => (this.failingSources.has(r.source) ? 0 : r.status === "ok" ? 2 : 1);
@@ -819,8 +854,8 @@ createApp({
 
     async load() {
       try {
-        [this.jobs, this.runs, this.cut, this.health] = await Promise.all(
-          [this.api("/api/jobs"), this.api("/api/runs"), this.api("/api/cut"), this.api("/api/health")]);
+        [this.jobs, this.runs, this.cut, this.health, this.pages] = await Promise.all(
+          [this.api("/api/jobs"), this.api("/api/runs"), this.api("/api/cut"), this.api("/api/health"), this.api("/api/pages")]);
         this.error = "";
       } catch (e) {
         this.error = this.t("Não foi possível carregar as vagas: {error}", { error: e.message });
@@ -1188,6 +1223,51 @@ createApp({
       return PLATFORM_NAMES[platform] || platform;
     },
 
+    openPages() {
+      this.pagesOpen = true;
+      this.pagesSeen = Date.now();
+      try {
+        localStorage.setItem(PAGES_SEEN_KEY, new Date(this.pagesSeen).toISOString());
+      } catch {
+        /* storage unavailable: "· n changed" just counts from the page load */
+      }
+    },
+
+    pageState(p) {
+      if (p.error) return this.t("erro na última leitura");
+      if (p.changed_at) return this.t("mudou {when}", { when: this.relative(p.changed_at) });
+      return p.checked_at ? this.t("sem mudanças") : this.t("lida na próxima procura");
+    },
+
+    // the new lines: the ones with your words first
+    pageLines(p) {
+      return [...p.hits, ...p.added.filter((line) => !p.hits.includes(line))].slice(0, 8);
+    },
+
+    async watchPage() {
+      this.pageForm.busy = true;
+      try {
+        const page = await this.api("/api/pages", { method: "POST",
+          body: JSON.stringify({ name: this.pageForm.name, url: this.pageForm.url }) });
+        this.pages = await this.api("/api/pages");
+        this.pageForm = { name: "", url: "", busy: false };
+        this.showToast(this.t("A {name} fica vigiada a partir da próxima procura.", { name: page.name }));
+      } catch (e) {
+        this.showToast(this.t("Não foi possível vigiar a página: {error}", { error: e.message }));
+      } finally {
+        this.pageForm.busy = false;
+      }
+    },
+
+    async unwatchPage(p) {
+      try {
+        await this.api(`/api/pages?url=${encodeURIComponent(p.url)}`, { method: "DELETE" });
+        this.pages = this.pages.filter((x) => x.url !== p.url);
+      } catch (e) {
+        this.showToast(this.t("Não foi possível deixar de vigiar: {error}", { error: e.message }));
+      }
+    },
+
     async openMarket() {
       try {
         this.market = await this.api("/api/market");
@@ -1390,8 +1470,13 @@ createApp({
         return; // keep the old time: the next opening tries again
       }
       for (const j of jobs) if (!this.jobs.some((x) => x.uid === j.uid)) this.jobs.push(j);
+      try {
+        this.pages = await this.api("/api/pages");
+      } catch {
+        /* the pages as they were loaded */
+      }
       const now = Date.now();
-      const summary = since ? this.blissSummary(since, now, jobs) : null;
+      const summary = since ? this.blissSummary(since, now, jobs, this.pages) : null;
       if (summary) {
         const last = this.bliss.messages[this.bliss.messages.length - 1];
         if (last && last.summary) this.bliss.messages.splice(-1, 1, summary);
@@ -1408,13 +1493,14 @@ createApp({
 
     // the jobs new since `since`, and the applications whose 7 days without a reply ended between `since` and
     // `now` (not every one still waiting: that would show a summary at every opening); null when there's nothing
-    blissSummary(since, now, jobs = this.jobs) {
+    blissSummary(since, now, jobs = this.jobs, pages = this.pages) {
       const fresh = jobs.filter((j) => j.status === "nova" && j.active && Date.parse(j.first_seen) > since)
         .sort((a, b) => b.score - a.score);
       const due = (j) => Date.parse(j.applied_at) + FOLLOW_UP_DAYS * 86400000;
       const reached = jobs.filter((j) => j.status === "candidatei" && j.applied_at && due(j) > since && due(j) <= now)
         .sort((a, b) => Date.parse(a.applied_at) - Date.parse(b.applied_at));
-      if (!fresh.length && !reached.length) return null;
+      const changed = pages.filter((p) => p.relevant && p.changed_at && Date.parse(p.changed_at) > since);
+      if (!fresh.length && !reached.length && !changed.length) return null;
       const lines = [];
       if (fresh.length) {
         lines.push(fresh.length === 1 ? this.t("Desde a última vez: 1 vaga nova.")
@@ -1423,6 +1509,11 @@ createApp({
       if (reached.length) {
         lines.push(reached.length === 1 ? this.t("1 candidatura chegou aos 7 dias sem resposta.")
           : this.t("{n} candidaturas chegaram aos 7 dias sem resposta.", { n: reached.length }));
+      }
+      if (changed.length) {
+        const names = new Intl.ListFormat(this.lang === "en" ? "en-GB" : "pt-PT").format(changed.map((p) => p.name));
+        lines.push(changed.length === 1 ? this.t("{names} mudou a página de carreiras.", { names })
+          : this.t("{names} mudaram a página de carreiras.", { names }));
       }
       // the follow-up is a button: in the summary nothing is written until it's clicked
       return { role: "bliss", local: true, summary: true, text: lines.join("\n"), jobs: fresh.slice(0, 3).map((j) => j.uid),
@@ -1728,6 +1819,11 @@ createApp({
   mounted() {
     this.loadLanguage();
     this.load();
+    try {
+      this.pagesSeen = Date.parse(localStorage.getItem(PAGES_SEEN_KEY) || "") || 0;
+    } catch {
+      /* storage unavailable */
+    }
     // ☰ Menu: a click anywhere (one of its items too) or Esc closes it; its own button stops the click
     document.addEventListener("click", () => (this.menuOpen = false));
     document.addEventListener("keydown", (e) => {
