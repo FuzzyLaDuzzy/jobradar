@@ -1,11 +1,14 @@
 """+ Add job from a link: the schema.org JobPosting careers sites embed, else the page's title."""
 
 import json
+import socket
 
 import httpx
 import pytest
 
 from jobradar import link
+
+REAL_RESOLVE = link._resolve  # before the fixture below replaces it
 
 POSTING = {"@context": "https://schema.org", "@type": "JobPosting", "title": "Junior Backend Developer",
            "datePosted": "2026-10-28T09:00:00Z", "description": "&lt;p&gt;Python and SQL.&lt;/p&gt;",
@@ -78,6 +81,22 @@ def test_local_and_private_addresses_are_not_opened(monkeypatch):
         with pytest.raises(link.LinkError, match="local ou privado"):
             link.read(url, any_page)
     assert seen == []
+
+
+def test_an_address_that_isnt_one_is_refused_cleanly():
+    for url in ("https://example.com:99999/", "http://[x/"):
+        with pytest.raises(link.LinkError):
+            link._address(url)
+
+
+def test_a_name_that_doesnt_resolve_is_not_called_local(monkeypatch):
+    # offline, or a typo: not "a local or private address"
+    monkeypatch.setattr(link, "_resolve", REAL_RESOLVE)
+    def no_dns(*args, **kwargs):
+        raise socket.gaierror("no such name")
+    monkeypatch.setattr(link.socket, "getaddrinfo", no_dns)
+    with pytest.raises(link.LinkError, match="encontrar"):
+        link._address("https://nao-existe.example/")
 
 
 def test_every_redirect_hop_is_checked(monkeypatch):

@@ -423,6 +423,7 @@ const EN = {
     "Careers pages of companies without a job platform. At every search, the app reads them again and tells you when a line with your area or level words appears.",
   "mudou {when}": "changed {when}",
   "erro na última leitura": "error at the last read",
+  "sem mudanças · lida {when}": "no changes · read {when}",
   "lida na próxima procura": "read at the next search",
   "Deixar de vigiar": "Stop watching",
   "Ainda não vigias nenhuma página.": "You're not watching any page yet.",
@@ -1236,7 +1237,8 @@ createApp({
     pageState(p) {
       if (p.error) return this.t("erro na última leitura");
       if (p.changed_at) return this.t("mudou {when}", { when: this.relative(p.changed_at) });
-      return p.checked_at ? this.t("sem mudanças") : this.t("lida na próxima procura");
+      return p.checked_at ? this.t("sem mudanças · lida {when}", { when: this.relative(p.checked_at) })
+        : this.t("lida na próxima procura");
     },
 
     // the new lines: the ones with your words first

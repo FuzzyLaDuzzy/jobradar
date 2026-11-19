@@ -302,13 +302,14 @@ def create_app(
     def watched_pages():
         """The careers pages being watched (watch.py), without their text. hits: the new lines with your words."""
         try:
-            words = watch.watch_words(config_mod.load(config_path))
+            cfg = config_mod.load(config_path)
         except config_mod.ConfigError:
-            words = []
+            cfg = {}
+        words, search = watch.watch_words(cfg), cfg.get("search") or {}
         pages = db.watched_pages()
         for page in pages:
             del page["lines"]
-            page["hits"] = [line for line in page["added"] if watch.is_relevant([line], words)]
+            page["hits"] = [line for line in page["added"] if watch.is_relevant([line], words, search)]
         return pages
 
     @app.post("/api/pages")

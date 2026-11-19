@@ -17,6 +17,10 @@ EN = {
     "a página precisa de JavaScript: não dá para vigiar": "the page needs JavaScript: it can't be watched",
     "Não foi possível abrir a página ({error}).": "Couldn't open the page ({error}).",
     "Esta página não está a ser vigiada.": "This page isn't being watched.",
+    "não deu para ler o robots.txt do site: a página fica por ler": "couldn't read the site's robots.txt: the page isn't read",
+    "Erro inesperado ao ler a página.": "Unexpected error reading the page.",
+    "Este link não é um endereço válido.": "This link isn't a valid address.",
+    "Não foi possível encontrar o site {host} (sem rede ou nome errado).": "Couldn't find the site {host} (no network, or a wrong name).",
     "1 página de carreiras mudou": "1 careers page changed",
     "{n} páginas de carreiras mudaram": "{n} careers pages changed",
     # config.py

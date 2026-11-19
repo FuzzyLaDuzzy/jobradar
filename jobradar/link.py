@@ -99,11 +99,12 @@ def parse(page: str) -> dict:
 def _resolve(host: str) -> str | None:
     """The address to connect to, when every address the name has is on the internet (not this computer, the home
     network or the cloud's metadata address); else None. The request then goes to this very address, so a name
-    that answers differently a second time (DNS rebinding) can't send it elsewhere."""
+    that answers differently a second time (DNS rebinding) can't send it elsewhere. A name that can't be found
+    (no network, a typo) is a LinkError of its own."""
     try:
         infos = socket.getaddrinfo(host, None, type=socket.SOCK_STREAM)
     except (OSError, UnicodeError):
-        return None
+        raise LinkError(t("Não foi possível encontrar o site {host} (sem rede ou nome errado).", host=host)) from None
     ips = [info[4][0].split("%")[0] for info in infos]
     return ips[0] if ips and all(ipaddress.ip_address(ip).is_global for ip in ips) else None
 
@@ -111,8 +112,12 @@ def _resolve(host: str) -> str | None:
 def _address(url: str) -> str:
     """The checked address to connect to for `url`: a web link (http/https), not a site that forbids programs,
     not this computer or the home network."""
-    parts = urlsplit(url)
-    host = (parts.hostname or "").lower()
+    try:
+        parts = urlsplit(url)
+        host = (parts.hostname or "").lower()
+        parts.port  # noqa: B018 (a port out of range raises here, not later in the request)
+    except ValueError:
+        raise LinkError(t("Este link não é um endereço válido.")) from None
     if parts.scheme not in ("http", "https") or not host:
         raise LinkError(t("o link tem de começar por http:// ou https://"))
     if any(name in host for name in BLOCKED):
